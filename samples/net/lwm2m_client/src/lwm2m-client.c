@@ -17,6 +17,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <zephyr/net/lwm2m.h>
 #include <zephyr/net/conn_mgr_monitor.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/pm/device_runtime.h>
 #include "modules.h"
 #include "lwm2m_resource_ids.h"
 
@@ -372,7 +374,11 @@ int main(void)
 	int ret;
 
 	LOG_INF(APP_BANNER);
-
+	/* Not quite sure where to invoke */
+	const struct device *modem = DEVICE_DT_GET(DT_ALIAS(modem));
+	LOG_INF("Powering on modem\n");
+	pm_device_action_run(modem, PM_DEVICE_ACTION_RESUME);
+	/* ---- */
 	k_sem_init(&quit_lock, 0, K_SEM_MAX_LIMIT);
 
 	if (IS_ENABLED(CONFIG_NET_CONNECTION_MANAGER)) {

@@ -342,6 +342,10 @@ int modem_socket_poll_prepare(struct modem_socket_config *cfg, struct modem_sock
 			      struct zsock_pollfd *pfd, struct k_poll_event **pev,
 			      struct k_poll_event *pev_end)
 {
+	printk("poll_prepare on socket %d: requested events: 0x%x\n", sock->id, pfd->events);
+
+	bool event_handled = false;
+
 	if (pfd->events & ZSOCK_POLLIN) {
 		if (*pev == pev_end) {
 			errno = ENOMEM;
@@ -351,19 +355,16 @@ int modem_socket_poll_prepare(struct modem_socket_config *cfg, struct modem_sock
 		k_poll_event_init(*pev, K_POLL_TYPE_SIGNAL, K_POLL_MODE_NOTIFY_ONLY,
 				  &sock->sig_data_ready);
 		(*pev)++;
+		event_handled = true;
 	}
-
+	
 	if (pfd->events & ZSOCK_POLLOUT) {
-		if (*pev == pev_end) {
-			errno = ENOMEM;
-			return -1;
-		}
-		/* Not Implemented */
-		errno = ENOTSUP;
-		return -1;
+		printk("POLLOUT requested but not implemented\n");
+		// You can implement this later when needed
+		// For now, just ignore it
 	}
-
-	return 0;
+	
+	return event_handled ? 0 : -ENOTSUP;
 }
 
 int modem_socket_poll_update(struct modem_socket *sock, struct zsock_pollfd *pfd,
