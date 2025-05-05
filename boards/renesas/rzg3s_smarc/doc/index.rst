@@ -70,7 +70,11 @@ and the following hardware features:
 +-----------+------------+-------------------------------------+
 | PINCTRL   | on-chip    | pinctrl                             |
 +-----------+------------+-------------------------------------+
+| ADC       | on-chip    | adc                                 |
++-----------+------------+-------------------------------------+
 | GPIO      | on-chip    | gpio                                |
++-----------+------------+-------------------------------------+
+| DMA       | on-chip    | dma                                 |
 +-----------+------------+-------------------------------------+
 | I2C       | on-chip    | i2c                                 |
 +-----------+------------+-------------------------------------+
@@ -91,6 +95,8 @@ Other hardware features are currently not supported by the port.
 
 Programming and Debugging
 *************************
+
+.. zephyr:board-supported-runners::
 
 RZ/G3S-EVKIT is designed to start different systems on different cores.
 It uses Yocto as the build system to build Linux system and boot loaders

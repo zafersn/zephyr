@@ -11,12 +11,12 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
+#include <zephyr/bluetooth/addr.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
 #include <zephyr/types.h>
-#include <zephyr/sys/util.h>
-#include <zephyr/bluetooth/addr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -2804,6 +2804,12 @@ struct bt_hci_evt_remote_name_req_complete {
 	uint8_t   name[248];
 } __packed;
 
+/* Encryption Value */
+#define BT_HCI_ENCRYPTION_OFF           0x00
+#define BT_HCI_ENCRYPTION_ON_LE_AES_CCM 0x01
+#define BT_HCI_ENCRYPTION_ON_BR_E0      0x01
+#define BT_HCI_ENCRYPTION_ON_BR_AES_CCM 0x02
+
 #define BT_HCI_EVT_ENCRYPT_CHANGE               0x08
 struct bt_hci_evt_encrypt_change {
 	uint8_t  status;
@@ -3396,6 +3402,13 @@ struct bt_hci_evt_le_cis_req {
 	uint8_t  cig_id;
 	uint8_t  cis_id;
 } __packed;
+
+#define BT_HCI_LE_BIG_HANDLE_MIN            0x00U
+#define BT_HCI_LE_BIG_HANDLE_MAX            0xEFU
+#define BT_HCI_LE_BIG_SYNC_DELAY_MIN        0x000030U
+#define BT_HCI_LE_BIG_SYNC_DELAY_MAX        0x7FFFFFU
+#define BT_HCI_LE_TRANSPORT_LATENCY_BIG_MIN 0x000030U
+#define BT_HCI_LE_TRANSPORT_LATENCY_BIG_MAX 0x7FFFFFU
 
 #define BT_HCI_EVT_LE_BIG_COMPLETE              0x1b
 struct bt_hci_evt_le_big_complete {

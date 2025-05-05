@@ -192,10 +192,28 @@ int llext_lookup_symbol(struct llext_loader *ldr, struct llext *ext, uintptr_t *
 			LOG_ERR("Undefined symbol with no entry in "
 				"symbol table %s, offset %zd, link section %d",
 				name, (size_t)rel->r_offset, shdr->sh_link);
+
+			if (!IS_ENABLED(CONFIG_LLEXT_EXPORT_DEVICES)) {
+				/**
+				 * Attempting to import device objects from LLEXT but forgetting to
+				 * enable the corresponding Kconfig option will result in cryptic
+				 * dynamic linking errors. Try to detect this situation by checking
+				 * if the symbol's name starts with the prefix used to name device
+				 * objects, and print a special warning directing users towards the
+				 * missing Kconfig option in such circumstances.
+				 */
+				const char *const dev_prefix = STRINGIFY(DEVICE_NAME_GET(EMPTY));
+				const int prefix_len = strlen(dev_prefix);
+
+				if (strncmp(name, dev_prefix, prefix_len) == 0) {
+					LOG_WRN("(Device objects are not available for import "
+						"because CONFIG_LLEXT_EXPORT_DEVICES is not enabled)");
+				}
+			}
 			return -ENODATA;
 		}
 
-		LOG_INF("found symbol %s at 0x%lx", name, *link_addr);
+		LOG_INF("found symbol %s at %#lx", name, *link_addr);
 	} else if (sym->st_shndx == SHN_ABS) {
 		/* Absolute symbol */
 		*link_addr = sym->st_value;
@@ -220,7 +238,7 @@ int llext_lookup_symbol(struct llext_loader *ldr, struct llext *ext, uintptr_t *
 			(uintptr_t)llext_loaded_sect_ptr(ldr, ext, sym->st_shndx) + sym->st_value;
 	} else {
 		LOG_ERR("cannot apply relocation: "
-			"target symbol has unexpected section index %d (0x%X)",
+			"target symbol has unexpected section index %d (%#x)",
 			sym->st_shndx, sym->st_shndx);
 		return -ENOEXEC;
 	}
@@ -239,7 +257,7 @@ static void llext_link_plt(struct llext_loader *ldr, struct llext *ext, elf_shdr
 	uint8_t *text = ext->mem[LLEXT_MEM_TEXT];
 
 	LOG_DBG("Found %p in PLT %u size %zu cnt %u text %p",
-		(void *)llext_string(ldr, ext, LLEXT_MEM_SHSTRTAB, shdr->sh_name),
+		(void *)llext_section_name(ldr, ext, shdr),
 		shdr->sh_type, (size_t)shdr->sh_entsize, sh_cnt, (void *)text);
 
 	const elf_shdr_t *sym_shdr = ldr->sects + LLEXT_MEM_SYMTAB;
@@ -289,7 +307,7 @@ static void llext_link_plt(struct llext_loader *ldr, struct llext *ext, elf_shdr
 			continue;
 		}
 
-		const char *name = llext_string(ldr, ext, LLEXT_MEM_STRTAB, sym.st_name);
+		const char *name = llext_symbol_name(ldr, ext, &sym);
 
 		/*
 		 * Both r_offset and sh_addr are addresses for which the extension
@@ -299,9 +317,14 @@ static void llext_link_plt(struct llext_loader *ldr, struct llext *ext, elf_shdr
 		 * beginning of the .text section in the ELF file can be
 		 * applied to the memory location of mem[LLEXT_MEM_TEXT].
 		 *
-		 * This is valid only when CONFIG_LLEXT_STORAGE_WRITABLE=y
-		 * and peek() is usable on the source ELF file.
+		 * This is valid only for LLEXT_STORAGE_WRITABLE loaders
+		 * since the buffer will be directly modified.
 		 */
+		if (ldr->storage != LLEXT_STORAGE_WRITABLE) {
+			LOG_ERR("PLT: cannot link read-only ELF file");
+			continue;
+		}
+
 		uint8_t *rel_addr = (uint8_t *)ext->mem[LLEXT_MEM_TEXT] -
 			ldr->sects[LLEXT_MEM_TEXT].sh_offset;
 
@@ -411,7 +434,7 @@ int llext_link(struct llext_loader *ldr, struct llext *ext, const struct llext_l
 
 		rel_cnt = shdr->sh_size / shdr->sh_entsize;
 
-		name = llext_string(ldr, ext, LLEXT_MEM_SHSTRTAB, shdr->sh_name);
+		name = llext_section_name(ldr, ext, shdr);
 
 		/*
 		 * FIXME: The Xtensa port is currently using a different way of
@@ -492,18 +515,15 @@ int llext_link(struct llext_loader *ldr, struct llext *ext, const struct llext_l
 					return ret;
 				}
 
-				LOG_DBG("relocation %d:%d info 0x%zx (type %zd, sym %zd) offset %zd"
+				LOG_DBG("relocation %d:%d info %#zx (type %zd, sym %zd) offset %zd"
 					" sym_name %s sym_type %d sym_bind %d sym_ndx %d",
 					i, j, (size_t)rel.r_info, (size_t)ELF_R_TYPE(rel.r_info),
 					(size_t)ELF_R_SYM(rel.r_info), (size_t)rel.r_offset,
 					name, ELF_ST_TYPE(sym.st_info),
 					ELF_ST_BIND(sym.st_info), sym.st_shndx);
 
-				LOG_INF("writing relocation symbol %s type %zd sym %zd at addr "
-					"0x%lx addr 0x%lx",
-					name, (size_t)ELF_R_TYPE(rel.r_info),
-					(size_t)ELF_R_SYM(rel.r_info),
-					op_loc, link_addr);
+				LOG_INF("writing relocation type %d at %#lx with symbol %s (%#lx)",
+					(int)ELF_R_TYPE(rel.r_info), op_loc, name, link_addr);
 			}
 #endif /* CONFIG_LLEXT_LOG_LEVEL */
 

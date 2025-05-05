@@ -10,6 +10,8 @@
 
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/i3c.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/rtio/rtio.h>
 
@@ -22,6 +24,7 @@
 #include "icm45686_bus.h"
 #include "icm45686_decoder.h"
 #include "icm45686_trigger.h"
+#include "icm45686_stream.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ICM45686, CONFIG_SENSOR_LOG_LEVEL);
@@ -67,46 +70,46 @@ static int icm45686_channel_get(const struct device *dev,
 
 	switch (chan) {
 	case SENSOR_CHAN_ACCEL_X:
-		icm45686_accel_ms(&data->edata, data->edata.payload.accel.x,
+		icm45686_accel_ms(data->edata.header.accel_fs, data->edata.payload.accel.x, false,
 				  &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_ACCEL_Y:
-		icm45686_accel_ms(&data->edata, data->edata.payload.accel.y,
+		icm45686_accel_ms(data->edata.header.accel_fs, data->edata.payload.accel.y, false,
 				  &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_ACCEL_Z:
-		icm45686_accel_ms(&data->edata, data->edata.payload.accel.z,
+		icm45686_accel_ms(data->edata.header.accel_fs, data->edata.payload.accel.z, false,
 				  &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_GYRO_X:
-		icm45686_gyro_rads(&data->edata, data->edata.payload.gyro.x,
+		icm45686_gyro_rads(data->edata.header.gyro_fs, data->edata.payload.gyro.x, false,
 				   &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_GYRO_Y:
-		icm45686_gyro_rads(&data->edata, data->edata.payload.gyro.y,
+		icm45686_gyro_rads(data->edata.header.gyro_fs, data->edata.payload.gyro.y, false,
 				   &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_GYRO_Z:
-		icm45686_gyro_rads(&data->edata, data->edata.payload.gyro.z,
+		icm45686_gyro_rads(data->edata.header.gyro_fs, data->edata.payload.gyro.z, false,
 				   &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_DIE_TEMP:
 		icm45686_temp_c(data->edata.payload.temp, &val->val1, &val->val2);
 		break;
 	case SENSOR_CHAN_ACCEL_XYZ:
-		icm45686_accel_ms(&data->edata, data->edata.payload.accel.x,
+		icm45686_accel_ms(data->edata.header.accel_fs, data->edata.payload.accel.x, false,
 				  &val[0].val1, &val[0].val2);
-		icm45686_accel_ms(&data->edata, data->edata.payload.accel.y,
+		icm45686_accel_ms(data->edata.header.accel_fs, data->edata.payload.accel.y, false,
 				  &val[1].val1, &val[1].val2);
-		icm45686_accel_ms(&data->edata, data->edata.payload.accel.z,
+		icm45686_accel_ms(data->edata.header.accel_fs, data->edata.payload.accel.z, false,
 				  &val[2].val1, &val[2].val2);
 		break;
 	case SENSOR_CHAN_GYRO_XYZ:
-		icm45686_gyro_rads(&data->edata, data->edata.payload.gyro.x,
+		icm45686_gyro_rads(data->edata.header.gyro_fs, data->edata.payload.gyro.x, false,
 				   &val->val1, &val->val2);
-		icm45686_gyro_rads(&data->edata, data->edata.payload.gyro.y,
+		icm45686_gyro_rads(data->edata.header.gyro_fs, data->edata.payload.gyro.y, false,
 				   &val[1].val1, &val[1].val2);
-		icm45686_gyro_rads(&data->edata, data->edata.payload.gyro.z,
+		icm45686_gyro_rads(data->edata.header.gyro_fs, data->edata.payload.gyro.z, false,
 				   &val[2].val1, &val[2].val2);
 		break;
 	default:
@@ -182,7 +185,7 @@ static inline void icm45686_submit_one_shot(const struct device *dev,
 		return;
 	}
 
-	uint8_t val = REG_ACCEL_DATA_X1_UI | REG_SPI_READ_BIT;
+	uint8_t val = REG_ACCEL_DATA_X1_UI | REG_READ_BIT;
 
 	rtio_sqe_prep_tiny_write(write_sqe,
 				 data->rtio.iodev,
@@ -198,6 +201,11 @@ static inline void icm45686_submit_one_shot(const struct device *dev,
 			   edata->payload.buf,
 			   sizeof(edata->payload.buf),
 			   NULL);
+	if (data->rtio.type == ICM45686_BUS_I2C) {
+		read_sqe->iodev_flags |= RTIO_IODEV_I2C_STOP | RTIO_IODEV_I2C_RESTART;
+	} else if (data->rtio.type == ICM45686_BUS_I3C) {
+		read_sqe->iodev_flags |= RTIO_IODEV_I3C_STOP | RTIO_IODEV_I3C_RESTART;
+	}
 	read_sqe->flags |= RTIO_SQE_CHAINED;
 
 	rtio_sqe_prep_callback_no_cqe(complete_sqe,
@@ -214,6 +222,8 @@ static void icm45686_submit(const struct device *dev, struct rtio_iodev_sqe *iod
 
 	if (!cfg->is_streaming) {
 		icm45686_submit_one_shot(dev, iodev_sqe);
+	} else if (IS_ENABLED(CONFIG_ICM45686_STREAM)) {
+		icm45686_stream_submit(dev, iodev_sqe);
 	} else {
 		LOG_ERR("Streaming not supported");
 		rtio_iodev_sqe_err(iodev_sqe, -ENOTSUP);
@@ -242,35 +252,51 @@ static int icm45686_init(const struct device *dev)
 	uint8_t val;
 	int err;
 
-	if (!spi_is_ready_iodev(data->rtio.iodev)) {
+#if CONFIG_SPI_RTIO
+	if ((data->rtio.type == ICM45686_BUS_SPI) && !spi_is_ready_iodev(data->rtio.iodev)) {
 		LOG_ERR("Bus is not ready");
 		return -ENODEV;
 	}
-
-	/* Soft-reset sensor to restore config to defaults */
-
-	err = reg_write(dev, REG_MISC2, REG_MISC2_SOFT_RST(1));
-	if (err) {
-		LOG_ERR("Failed to write soft-reset: %d", err);
-		return err;
+#endif
+#if CONFIG_I2C_RTIO
+	if ((data->rtio.type == ICM45686_BUS_I2C) && !i2c_is_ready_iodev(data->rtio.iodev)) {
+		LOG_ERR("Bus is not ready");
+		return -ENODEV;
 	}
-	/* Wait for soft-reset to take effect */
-	k_sleep(K_MSEC(1));
+#endif
 
-	/* A complete soft-reset clears the bit */
-	err = reg_read(dev, REG_MISC2, &read_val);
-	if (err) {
-		LOG_ERR("Failed to read soft-reset: %d", err);
-		return err;
-	}
-	if ((read_val & REG_MISC2_SOFT_RST(1)) != 0) {
-		LOG_ERR("Soft-reset command failed");
-		return -EIO;
+	/** Soft-reset sensor to restore config to defaults,
+	 * unless it's already handled by I3C initialization.
+	 */
+	if (data->rtio.type != ICM45686_BUS_I3C) {
+		err = reg_write(dev, REG_MISC2, REG_MISC2_SOFT_RST(1));
+		if (err) {
+			LOG_ERR("Failed to write soft-reset: %d", err);
+			return err;
+		}
+		/* Wait for soft-reset to take effect */
+		k_sleep(K_MSEC(1));
+
+		/* A complete soft-reset clears the bit */
+		err = reg_read(dev, REG_MISC2, &read_val);
+		if (err) {
+			LOG_ERR("Failed to read soft-reset: %d", err);
+			return err;
+		}
+		if ((read_val & REG_MISC2_SOFT_RST(1)) != 0) {
+			LOG_ERR("Soft-reset command failed");
+			return -EIO;
+		}
 	}
 
 	/* Set Slew-rate to 10-ns typical, to allow proper SPI readouts */
 
 	err = reg_write(dev, REG_DRIVE_CONFIG0, REG_DRIVE_CONFIG0_SPI_SLEW(2));
+	if (err) {
+		LOG_ERR("Failed to write slew-rate: %d", err);
+		return err;
+	}
+	err = reg_write(dev, REG_DRIVE_CONFIG1, REG_DRIVE_CONFIG1_I3C_SLEW(3));
 	if (err) {
 		LOG_ERR("Failed to write slew-rate: %d", err);
 		return err;
@@ -354,6 +380,12 @@ static int icm45686_init(const struct device *dev)
 			LOG_ERR("Failed to initialize triggers: %d", err);
 			return err;
 		}
+	} else if (IS_ENABLED(CONFIG_ICM45686_STREAM)) {
+		err = icm45686_stream_init(dev);
+		if (err) {
+			LOG_ERR("Failed to initialize streaming: %d", err);
+			return err;
+		}
 	}
 
 	LOG_DBG("Init OK");
@@ -374,10 +406,21 @@ static int icm45686_init(const struct device *dev)
 #define ICM45686_INIT(inst)									   \
 												   \
 	RTIO_DEFINE(icm45686_rtio_ctx_##inst, 8, 8);						   \
-	SPI_DT_IODEV_DEFINE(icm45686_bus_##inst,						   \
-			    DT_DRV_INST(inst),							   \
-			    SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,		   \
-			    0U);								   \
+												   \
+	COND_CODE_1(DT_INST_ON_BUS(inst, i3c),							   \
+		    (I3C_DT_IODEV_DEFINE(icm45686_bus_##inst,					   \
+					 DT_DRV_INST(inst))),					   \
+	(COND_CODE_1(DT_INST_ON_BUS(inst, i2c),							   \
+		    (I2C_DT_IODEV_DEFINE(icm45686_bus_##inst,					   \
+					 DT_DRV_INST(inst))),					   \
+		    ())));									   \
+	COND_CODE_1(DT_INST_ON_BUS(inst, spi),							   \
+		    (SPI_DT_IODEV_DEFINE(icm45686_bus_##inst,					   \
+					 DT_DRV_INST(inst),					   \
+					 SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,  \
+					 0U)),							   \
+		    ());									   \
+												   \
 												   \
 	static const struct icm45686_config icm45686_cfg_##inst = {				   \
 		.settings = {									   \
@@ -393,18 +436,25 @@ static int icm45686_init(const struct device *dev)
 				.odr = DT_INST_PROP(inst, gyro_odr),				   \
 				.lpf = DT_INST_PROP_OR(inst, gyro_lpf, 0),			   \
 			},									   \
+			.fifo_watermark = DT_INST_PROP_OR(inst, fifo_watermark, 0),		   \
 		},										   \
 		.int_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, int_gpios, {0}),			   \
 	};											   \
 	static struct icm45686_data icm45686_data_##inst = {					   \
 		.edata.header = {								   \
-			.is_fifo = false,							   \
 			.accel_fs = DT_INST_PROP(inst, accel_fs),				   \
 			.gyro_fs = DT_INST_PROP(inst, gyro_fs),					   \
 		},										   \
 		.rtio = {									   \
 			.iodev = &icm45686_bus_##inst,						   \
 			.ctx = &icm45686_rtio_ctx_##inst,					   \
+			COND_CODE_1(DT_INST_ON_BUS(inst, i3c),					   \
+				(.type = ICM45686_BUS_I3C,					   \
+				 .i3c.id = I3C_DEVICE_ID_DT_INST(inst),),			   \
+			(COND_CODE_1(DT_INST_ON_BUS(inst, i2c),					   \
+				(.type = ICM45686_BUS_I2C), ())))				   \
+			COND_CODE_1(DT_INST_ON_BUS(inst, spi),					   \
+				(.type = ICM45686_BUS_SPI), ())					   \
 		},										   \
 	};											   \
 												   \

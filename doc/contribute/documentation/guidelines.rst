@@ -883,6 +883,21 @@ Application build commands
 
       If set, additional arguments to the flash invocation.
 
+   .. rst:directive:option:: debug-args
+      :type: string
+
+      If set, additional arguments to the debug invocation.
+
+   .. rst:directive:option:: debugserver-args
+      :type: string
+
+      If set, additional arguments to the debugserver invocation.
+
+   .. rst:directive:option:: attach-args
+      :type: string
+
+      If set, additional arguments to the attach invocation.
+
    .. rst:directive:option:: snippets
       :type: string
 
@@ -1265,6 +1280,21 @@ Boards
       This directive requires that the documentation is built with hardware features generation enabled
       (``zephyr_generate_hw_features`` config option set to ``True``). If disabled, a warning message
       will be shown instead of the hardware features tables.
+
+.. rst:directive:: .. zephyr:board-supported-runners::
+
+   This directive is used to show the supported runners for the board documented in the current
+   page, including which runner is the default for flashing and debugging.
+
+   The directive must be used in a document that also contains a :rst:dir:`zephyr:board` directive,
+   as it relies on the board information to generate the table.
+
+   .. note::
+
+      Similar to :rst:dir:`zephyr:board-supported-hw`, this directive requires hardware features
+      generation to be enabled (``zephyr_generate_hw_features`` config option set to ``True``) to
+      produce a complete table. If disabled, a warning message will be shown instead of the runners
+      tables.
 
 References
 **********

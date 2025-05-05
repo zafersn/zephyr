@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 Nordic Semiconductor ASA
+ * Copyright 2025 NXP
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -263,28 +264,8 @@ static int bt_ipc_send(const struct device *dev, struct net_buf *buf)
 {
 	struct ipc_data *data = dev->data;
 	int err;
-	uint8_t pkt_indicator;
 
-	LOG_DBG("buf %p type %u len %u", buf, bt_buf_get_type(buf), buf->len);
-
-	switch (bt_buf_get_type(buf)) {
-	case BT_BUF_ACL_OUT:
-		pkt_indicator = BT_HCI_H4_ACL;
-		break;
-	case BT_BUF_CMD:
-		pkt_indicator = BT_HCI_H4_CMD;
-		break;
-	case BT_BUF_ISO_OUT:
-		pkt_indicator = BT_HCI_H4_ISO;
-		break;
-	default:
-		LOG_ERR("Unknown type %u", bt_buf_get_type(buf));
-		err = -ENOMSG;
-		goto done;
-	}
-	net_buf_push_u8(buf, pkt_indicator);
-
-	LOG_HEXDUMP_DBG(buf->data, buf->len, "Final HCI buffer:");
+	LOG_DBG("buf %p type %u len %u", buf, buf->data[0], buf->len);
 
 	for (int retries = 0; retries < CONFIG_BT_HCI_IPC_SEND_RETRY_COUNT + 1; retries++) {
 		err = ipc_service_send(&data->hci_ept, buf->data, buf->len);
@@ -305,7 +286,6 @@ static int bt_ipc_send(const struct device *dev, struct net_buf *buf)
 		err = 0;
 	}
 
-done:
 	net_buf_unref(buf);
 	return err;
 }
@@ -377,14 +357,6 @@ static int bt_ipc_close(const struct device *dev)
 {
 	struct ipc_data *ipc = dev->data;
 	int err;
-
-	if (IS_ENABLED(CONFIG_BT_HCI_HOST)) {
-		err = bt_hci_cmd_send_sync(BT_HCI_OP_RESET, NULL, NULL);
-		if (err) {
-			LOG_ERR("Sending reset command failed with: %d", err);
-			return err;
-		}
-	}
 
 	err = ipc_service_deregister_endpoint(&ipc->hci_ept);
 	if (err) {
