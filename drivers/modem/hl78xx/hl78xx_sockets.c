@@ -694,7 +694,6 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 		if (ret < 0) {
 			goto error;
 		}
-		sock->is_pending_bind = true;
 	}
 	errno = 0;
 	return 0;
@@ -895,11 +894,13 @@ static ssize_t offload_recvfrom(void *obj, void *buf, size_t len, int flags, str
 	if (!next_packet_size) {
 		if (flags & ZSOCK_MSG_DONTWAIT) {
 			errno = EAGAIN;
+			ret = -1;
 			goto exit;
 		}
 
 		if (!sock->is_connected && sock->ip_proto != IPPROTO_UDP) {
 			errno = 0;
+			ret = 0;
 			goto exit;
 		}
 
