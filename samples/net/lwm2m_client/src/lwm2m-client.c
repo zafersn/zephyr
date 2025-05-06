@@ -375,9 +375,11 @@ int main(void)
 
 	LOG_INF(APP_BANNER);
 	/* Not quite sure where to invoke */
+	#ifdef CONFIG_MODEM_HL78XX
 	const struct device *modem = DEVICE_DT_GET(DT_ALIAS(modem));
 	LOG_INF("Powering on modem\n");
 	pm_device_action_run(modem, PM_DEVICE_ACTION_RESUME);
+	#endif
 	/* ---- */
 	k_sem_init(&quit_lock, 0, K_SEM_MAX_LIMIT);
 
