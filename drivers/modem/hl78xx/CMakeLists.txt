@@ -13,4 +13,8 @@ zephyr_library_sources(
 )
 
 zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/ip)
+<<<<<<< HEAD
 zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/lib/sockets)
+=======
+zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/lib/sockets)
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e

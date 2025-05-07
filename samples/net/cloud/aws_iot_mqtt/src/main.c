@@ -16,6 +16,8 @@
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/data/json.h>
 #include <zephyr/random/random.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/pm/device_runtime.h>
 #include <zephyr/logging/log.h>
 #include "net_sample_common.h"
 
@@ -453,7 +455,13 @@ static int resolve_broker_addr(struct sockaddr_in *broker)
 int main(void)
 {
 	setup_credentials();
-
+	/* Not quite sure where to invoke */
+	#ifdef CONFIG_MODEM_HL78XX
+	const struct device *modem = DEVICE_DT_GET(DT_ALIAS(modem));
+	LOG_INF("Powering on modem\n");
+	pm_device_action_run(modem, PM_DEVICE_ACTION_RESUME);
+	#endif
+	/* ------------------- */
 	wait_for_network();
 
 	for (;;) {

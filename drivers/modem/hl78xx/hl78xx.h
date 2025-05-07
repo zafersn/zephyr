@@ -25,6 +25,7 @@
 #include "../modem_context.h"
 #include "../modem_socket.h"
 
+<<<<<<< HEAD
 #define MDM_CMD_TIMEOUT                      (10)  // K_SECONDS
 #define MDM_DNS_TIMEOUT                      (70)  // K_SECONDS
 #define MDM_CELL_BAND_SEARCH_TIMEOUT         (60)  // K_SECONDS
@@ -64,11 +65,53 @@
 #elif defined(CONFIG_MODEM_HL78XX_ADDRESS_FAMILY_IPV4)
 #define MODEM_HL78XX_ADDRESS_FAMILY            ADDRESS_FAMILY_IPV4
 #define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT     "###.###.###.###"
+=======
+#define MDM_CMD_TIMEOUT					(10) //K_SECONDS
+#define MDM_DNS_TIMEOUT					(70) //K_SECONDS
+#define MDM_CELL_BAND_SEARCH_TIMEOUT	(60) //K_SECONDS
+#define MDM_CMD_CONN_TIMEOUT			(120) //K_SECONDS
+#define MDM_REGISTRATION_TIMEOUT		(180) //K_SECONDS
+#define MDM_PROMPT_CMD_DELAY			(50) // K_MSEC
+#define MDM_RESET_LOW_TIME 				(1) // K_MSEC
+#define MDM_RESET_HIGH_TIME 			(10) // K_MSEC
+#define MDM_BOOT_TIME 					(12)//K_SECONDS
+#define MDM_DNS_ADD_TIMEOUT				(100)//K_MSEC
+#define MODEM_HL78XX_PERIODIC_SCRIPT_TIMEOUT \
+	K_MSEC(CONFIG_MODEM_HL78XX_PERIODIC_SCRIPT_MS)
+
+#define MDM_MAX_DATA_LENGTH				CONFIG_MODEM_HL78XX_UART_BUFFER_SIZES
+
+#define MDM_MAX_SOCKETS					6
+#define MDM_BASE_SOCKET_NUM				1
+
+#define MDM_MANUFACTURER_LENGTH			10
+#define MDM_MODEL_LENGTH				16
+#define MDM_REVISION_LENGTH				64
+#define MDM_IMEI_LENGTH					16
+#define MDM_IMSI_LENGTH					23
+#define MDM_ICCID_LENGTH				22
+#define MDM_APN_MAX_LENGTH					64
+
+#define ADDRESS_FAMILY_IP "IP"
+#define ADDRESS_FAMILY_IP4 "IPV4"
+#define ADDRESS_FAMILY_IPV6 "IPV6"
+#define ADDRESS_FAMILY_IPV4V6 "IPV4V6" 
+#define MDM_HL78XX_SOCKET_AF_IPV4 0
+#define MDM_HL78XX_SOCKET_AF_IPV6 1
+#if defined(CONFIG_MODEM_HL78XX_ADDRESS_FAMILY_IPV4V6)
+#define MODEM_HL78XX_ADDRESS_FAMILY ADDRESS_FAMILY_IPV4V6
+#define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT "####:####:####:####:####:####:####:####"
+#define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT_LEN sizeof("a01.a02.a03.a04.a05.a06.a07.a08.a09.a10.a11.a12.a13.a14.a15.a16")
+#elif defined(CONFIG_MODEM_HL78XX_ADDRESS_FAMILY_IPV4)
+#define MODEM_HL78XX_ADDRESS_FAMILY ADDRESS_FAMILY_IPV4
+#define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT "###.###.###.###"
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 #define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT_LEN sizeof(MODEM_HL78XX_ADDRESS_FAMILY_FORMAT)
 
 #else
 #define MODEM_HL78XX_ADDRESS_FAMILY ADDRESS_FAMILY_IPV6
 #endif
+<<<<<<< HEAD
 
 /* Modem Communication Patterns */
 #define EOF_PATTERN      "--EOF--Pattern--"
@@ -106,6 +149,46 @@ enum mdm_hl78xx_rat_mode {
 	MDM_RAT_NBNTN,
 	MDM_RAT_MODE_NONE,
 	// MDM_RAT_MODE_NONE = MDM_RAT_CAT_GSM
+=======
+	
+/* Modem Communication Patterns */
+#define EOF_PATTERN                      "--EOF--Pattern--"
+#define EOF_PATTERN_GNSS                 "+++"
+#define CONNECT_STRING                   "CONNECT"
+
+/* RAT (Radio Access Technology) commands */
+#define SET_RAT_M1_CMD_LEGACY           "AT+KSRAT=0"
+#define SET_RAT_NB1_CMD_LEGACY          "AT+KSRAT=1"
+#define SET_RAT_GSM_CMD_LEGACY          "AT+KSRAT=2"
+#define SET_RAT_NBNTN_CMD_LEGACY        "AT+KSRAT=3"
+
+#define KSRAT_QUERY				        "AT+KSRAT?"
+#define DISABLE_RAT_AUTO				"AT+KSELACQ=0,0"
+
+#define SET_RAT_M1_CMD                  "AT+KSRAT=0,1"
+#define SET_RAT_NB1_CMD                 "AT+KSRAT=1,1"
+#define SET_RAT_GMS_CMD                 "AT+KSRAT=2,1"
+#define SET_RAT_NBNTN_CMD               "AT+KSRAT=3,1"
+
+/* Power mode commands */
+#define SET_AIRPLANE_MODE_CMD_LEGACY    "AT+CFUN=4,0"
+#define SET_AIRPLANE_MODE_CMD           "AT+CFUN=4,1"
+#define SET_FULLFUNCTIONAL_MODE_CMD_LEGACY "AT+CFUN=1,0"
+#define SET_FULLFUNCTIONAL_MODE_CMD     "AT+CFUN=1,1"
+
+/* Helper macros */
+#define ATOI(s_, value_, desc_)         modem_atoi(s_, value_, desc_, __func__)
+
+/* Enums */
+enum mdm_hl78xx_rat_mode 
+{
+ 	MDM_RAT_CAT_M1 = 0,
+ 	MDM_RAT_NB1,
+	MDM_RAT_GSM,
+	MDM_RAT_NBNTN,
+	MDM_RAT_MODE_NONE,
+	//MDM_RAT_MODE_NONE = MDM_RAT_CAT_GSM
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 };
 
 enum mdm_hl78xx_gnss_event {
@@ -216,10 +299,19 @@ struct modem_hl78xx_data {
 	struct gpio_callback mdm_uart_dsr_cb;
 	struct gpio_callback mdm_gpio6_cb;
 	struct gpio_callback mdm_uart_cts_cb;
+<<<<<<< HEAD
+=======
+
+#if !defined(CONFIG_MODEM_HL78XX_AUTODETECT_APN)
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 	/* modem variant */
 	int mdm_variant;
 	/* APN */
 	char mdm_apn[MDM_APN_MAX_LENGTH];
+<<<<<<< HEAD
+=======
+#endif
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 
 	enum modem_hl78xx_state state;
 	const struct device *dev;
@@ -233,7 +325,11 @@ struct modem_hl78xx_data {
 	struct ring_buf event_rb;
 	struct k_mutex event_rb_lock;
 
+<<<<<<< HEAD
 	/* socket data */
+=======
+		/* socket data */
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 	struct modem_socket_config socket_config;
 	struct modem_socket sockets[MDM_MAX_SOCKETS];
 };
@@ -254,10 +350,18 @@ struct modem_hl78xx_config {
 	uint16_t reset_pulse_duration_ms;
 	uint16_t startup_time_ms;
 	uint16_t shutdown_time_ms;
+<<<<<<< HEAD
 
 	bool autostarts;
 
 	const struct modem_chat_script *init_chat_script;
+=======
+	
+	bool autostarts;
+
+	const struct modem_chat_script *init_chat_script;
+
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 };
 /* socket read callback data */
 struct socket_read_data {
@@ -270,7 +374,11 @@ struct socket_read_data {
 /**
  * @brief Check if the cellular modem is registered on the network.
  *
+<<<<<<< HEAD
  * This function checks the modem's current registration status and
+=======
+ * This function checks the modem's current registration status and 
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
  * returns true if the device is registered with a cellular network.
  *
  * @param data Pointer to the modem HL78xx driver data structure.
@@ -333,7 +441,11 @@ void socknotifydata(int socket_id, int new_total);
 /**
  * @brief Find a memory block inside another block (C99-compatible version).
  *
+<<<<<<< HEAD
  * Searches for the first occurrence of the byte string needle of length needlelen
+=======
+ * Searches for the first occurrence of the byte string needle of length needlelen 
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
  * in the memory area haystack of length haystacklen.
  *
  * @param haystack Pointer to the memory block to search within.
@@ -356,6 +468,7 @@ void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle, s
  */
 static inline uint8_t *modem_get_mac(uint8_t *mac_addr)
 {
+<<<<<<< HEAD
 	uint32_t hash_value;
 	const char *dummy_imei = "111111111111111";
 
@@ -397,5 +510,25 @@ int find_apn(char *apn, int apnlen, const char *profiles, const char *associated
  * @return 0 on success, negative errno code on failure.
  */
 int modem_detect_apn(struct modem_hl78xx_data *data, const char *associated_number);
+=======
+    uint32_t hash_value;
+    const char *dummy_imei = "111111111111111";
+
+    /* Define MAC address prefix */
+    mac_addr[0] = 0x00;
+    mac_addr[1] = 0x10;
+
+    /* Generate MAC address based on IMEI */
+    hash_value = hash32(dummy_imei, strlen(dummy_imei));
+    UNALIGNED_PUT(hash_value, (uint32_t *)(mac_addr + 2));
+
+    return mac_addr;
+}
+
+#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID) || defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
+int find_apn(char *apn, int apnlen, const char *profiles, const char *associated_number);
+int modem_detect_apn(struct modem_hl78xx_data *data, const char *associated_number);
+
+>>>>>>> 6137499206e6fbb34aa7805f4e3a30768fbd123e
 #endif
 #endif /* HL78XX_H */
