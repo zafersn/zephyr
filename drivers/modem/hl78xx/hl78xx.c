@@ -1,9 +1,3 @@
-/*
- * Copyright 2024 NXP
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include <zephyr/modem/chat.h>
 #include <zephyr/modem/backend/uart.h>
 #include <zephyr/kernel.h>
@@ -25,7 +19,6 @@ LOG_MODULE_REGISTER(hl78xx_dev, CONFIG_MODEM_LOG_LEVEL);
 
 /* RX thread work queue */
 K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_HL78XX_RX_WORKQ_STACK_SIZE);
-
 
 static struct k_work_q modem_workq;
 
@@ -210,7 +203,8 @@ static void modem_cellular_chat_on_cxreg(struct modem_chat *chat, char **argv, u
 	} else {
 		return;
 	}
-	if (strcmp(argv[0], "+CREG: ") == 0 && data->mdm_registration_status.rat_mode == MDM_RAT_GSM) {
+	if (strcmp(argv[0], "+CREG: ") == 0 &&
+	    data->mdm_registration_status.rat_mode == MDM_RAT_GSM) {
 		data->mdm_registration_status.network_state = registration_status;
 	} else if (strcmp(argv[0], "+CGREG: ") == 0) {
 		data->mdm_registration_status.network_state = registration_status;
@@ -242,9 +236,9 @@ static void modem_cellular_chat_on_ksup(struct modem_chat *chat, char **argv, ui
 {
 	char ksup_data[2] = {0};
 	strncpy(ksup_data, argv[1], sizeof(ksup_data) - 1);
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("Module status: %s", ksup_data);
-	#endif
+#endif
 }
 static void modem_cellular_chat_on_imei(struct modem_chat *chat, char **argv, uint16_t argc,
 					void *user_data)
@@ -254,9 +248,9 @@ static void modem_cellular_chat_on_imei(struct modem_chat *chat, char **argv, ui
 	if (argc != 2) {
 		return;
 	}
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("IMEI: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 	strncpy(data->imei, argv[1], sizeof(data->imei) - 1);
 }
 
@@ -268,9 +262,9 @@ static void modem_cellular_chat_on_cgmm(struct modem_chat *chat, char **argv, ui
 	if (argc != 2) {
 		return;
 	}
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("cgmm: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 	strncpy(data->model_id, argv[1], sizeof(data->model_id) - 1);
 }
 static void modem_cellular_chat_on_imsi(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -281,14 +275,14 @@ static void modem_cellular_chat_on_imsi(struct modem_chat *chat, char **argv, ui
 	if (argc != 2) {
 		return;
 	}
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("IMSI: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 	strncpy(data->imsi, argv[1], sizeof(data->imsi) - 1);
-	#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
+#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
 	/* set the APN automatically */
 	modem_detect_apn(data, argv[1]);
-	#endif
+#endif
 }
 static void modem_cellular_chat_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc,
 					void *user_data)
@@ -298,9 +292,9 @@ static void modem_cellular_chat_on_cgmi(struct modem_chat *chat, char **argv, ui
 	if (argc != 2) {
 		return;
 	}
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("cgmi: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 	strncpy(data->manufacturer, argv[1], sizeof(data->manufacturer) - 1);
 }
 
@@ -312,27 +306,27 @@ static void modem_cellular_chat_on_cgmr(struct modem_chat *chat, char **argv, ui
 	if (argc != 2) {
 		return;
 	}
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("cgmr: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 	strncpy(data->fw_version, argv[1], sizeof(data->fw_version) - 1);
 }
 static void modem_cellular_chat_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc,
-	void *user_data)
+					 void *user_data)
 {
 	struct modem_hl78xx_data *data = (struct modem_hl78xx_data *)user_data;
 
 	if (argc != 2) {
 		return;
 	}
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("ICCID: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 	strncpy(data->iccid, argv[1], sizeof(data->iccid) - 1);
-	#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID)
+#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID)
 	/* set the APN automatically */
 	modem_detect_apn(data, argv[1]);
-	#endif
+#endif
 }
 /* Handler: +KSTATEV: */
 static void modem_cellular_chat_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -366,9 +360,9 @@ static void modem_cellular_chat_on_socknotifydata(struct modem_chat *chat, char 
 	}
 	socket_id = ATOI(argv[1], 0, "socket_id");
 	new_total = ATOI(argv[2], 0, "length");
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("%d %s %d %d", __LINE__, __func__, socket_id, new_total);
-	#endif
+#endif
 	socknotifydata(socket_id, new_total);
 	return;
 }
@@ -381,12 +375,12 @@ static void modem_cellular_chat_on_ksrep(struct modem_chat *chat, char **argv, u
 	}
 
 	data->ksrep = (uint8_t)atoi(argv[1]);
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("KSREP: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 }
 static void modem_cellular_chat_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc,
-	void *user_data)
+					 void *user_data)
 {
 	struct modem_hl78xx_data *data = (struct modem_hl78xx_data *)user_data;
 	if (argc < 2) {
@@ -394,9 +388,9 @@ static void modem_cellular_chat_on_ksrat(struct modem_chat *chat, char **argv, u
 	}
 
 	data->mdm_registration_status.rat_mode = (uint8_t)atoi(argv[1]);
-	#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("KSREP: %s %s", argv[0], argv[1]);
-	#endif
+#endif
 }
 
 MODEM_CHAT_MATCH_DEFINE(ok_match, "OK", "", NULL);
@@ -486,11 +480,13 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CIMI", cimi_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGEREP=2", ok_match),
+#if CONFIG_MODEM_HL7812
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CREG=0", ok_match),
+#endif
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEREG=5", ok_match), );
 
 MODEM_CHAT_SCRIPT_DEFINE(swir_hl78xx_init_chat_script, swir_hl78xx_init_chat_script_cmds,
-			 abort_matches, modem_cellular_chat_callback_handler, 10);
+			 abort_matches, modem_cellular_chat_callback_handler, 15);
 
 int modem_cmd_send_int(struct modem_hl78xx_data *user_data,
 		       modem_chat_script_callback script_user_callback, const uint8_t *cmd,
@@ -796,7 +792,7 @@ static void modem_cellular_run_init_fail_script_event_handler(struct modem_hl78x
 				"dts!!");
 		}
 
-		#define CONFIG_MAX_SCRIPT_AT_CMD_RETRY 3
+#define CONFIG_MAX_SCRIPT_AT_CMD_RETRY 3
 		if (data->script_fail_counter++ < CONFIG_MAX_SCRIPT_AT_CMD_RETRY) {
 			if (modem_cellular_gpio_is_enabled(&config->mdm_gpio_pwr_on)) {
 				modem_cellular_enter_state(data, MODEM_HL78XX_STATE_POWER_ON_PULSE);
@@ -819,86 +815,82 @@ static int modem_cellular_on_run_rat_cfg_script_state_enter(struct modem_hl78xx_
 	int ret = 0;
 	bool modem_require_restart = false;
 
-	#if defined(CONFIG_MODEM_HL78XX_AUTO_RAT)
-			/* Check autorat status/configs */
-			if (IS_ENABLED(CONFIG_MODEM_HL78XX_AUTORAT_OVER_WRITE_PRL) ||
-				(data->kselacq_data.mode != 0 && data->kselacq_data.mode == 0)) {
-				char cmd_kselq[] = "AT+KSELACQ=0," CONFIG_MODEM_HL78XX_AUTORAT_PRL_PROFILES;
+#if defined(CONFIG_MODEM_HL78XX_AUTO_RAT)
+	/* Check autorat status/configs */
+	if (IS_ENABLED(CONFIG_MODEM_HL78XX_AUTORAT_OVER_WRITE_PRL) ||
+	    (data->kselacq_data.mode != 0 && data->kselacq_data.mode == 0)) {
+		char cmd_kselq[] = "AT+KSELACQ=0," CONFIG_MODEM_HL78XX_AUTORAT_PRL_PROFILES;
 
-				/* Re-congfiguring PRL context definition */
-				ret = modem_cmd_send_int(data, NULL, cmd_kselq, strlen(cmd_kselq),
-							&ok_match, 1);
-				if (ret < 0) {
-					goto error;
-				}
+		/* Re-congfiguring PRL context definition */
+		ret = modem_cmd_send_int(data, NULL, cmd_kselq, strlen(cmd_kselq), &ok_match, 1);
+		if (ret < 0) {
+			goto error;
+		}
 
-			} else {
-				/* do smth */
-			}
-	#else
-			/* Check active rat config  */
+	} else {
+		/* do smth */
+	}
+#else
+	/* Check active rat config  */
 
-			if (data->kselacq_data.mode != 0 && data->kselacq_data.rat1 != 0) {
-				char const *cmd_kselq_disable = (const char *)DISABLE_RAT_AUTO;
+	if (data->kselacq_data.mode != 0 && data->kselacq_data.rat1 != 0) {
+		char const *cmd_kselq_disable = (const char *)DISABLE_RAT_AUTO;
 
-				/* Re-congfiguring PRL context definition */
-				ret = modem_cmd_send_int(data, NULL, cmd_kselq_disable, strlen(cmd_kselq_disable),
-							&ok_match, 1);
-				if (ret < 0) {
-					goto error;
-				}
-			}
-			char const *cmd_ksrat_query = (const char *)KSRAT_QUERY;
+		/* Re-congfiguring PRL context definition */
+		ret = modem_cmd_send_int(data, NULL, cmd_kselq_disable, strlen(cmd_kselq_disable),
+					 &ok_match, 1);
+		if (ret < 0) {
+			goto error;
+		}
+	}
+	char const *cmd_ksrat_query = (const char *)KSRAT_QUERY;
 
-			/* Re-congfiguring PRL context definition */
-			ret = modem_cmd_send_int(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query),
-							&ksrat_match, 1);
+	/* Re-congfiguring PRL context definition */
+	ret = modem_cmd_send_int(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query), &ksrat_match,
+				 1);
+	if (ret < 0) {
+		goto error;
+	}
+	enum mdm_hl78xx_rat_mode rat_config_request = MDM_RAT_MODE_NONE;
+#if CONFIG_MODEM_HL78XX_RAT_M1
+	char *cmd_rat_cat = (const char *)SET_RAT_M1_CMD_LEGACY;
+	rat_config_request = MDM_RAT_CAT_M1;
+#elif CONFIG_MODEM_HL78XX_RAT_NB1
+	const char *cmd_rat_nb = (const char *)SET_RAT_NB1_CMD_LEGACY;
+	rat_config_request = MDM_RAT_NB1;
+#if CONFIG_MODEM_HL7812
+#elif CONFIG_MODEM_HL78XX_RAT_GSM
+	char *cmd_rat_gsm = (const char *)SET_RAT_GSM_CMD_LEGACY;
+	rat_config_request = MDM_RAT_GSM;
+#elif CONFIG_MODEM_HL78XX_RAT_NBNTN
+	char *cmd_rat_nbntn = (const char *)SET_RAT_NBNTN_CMD_LEGACY;
+	rat_config_request = MDM_RAT_NBNTN;
+#endif
+#endif
+	if (rat_config_request != data->mdm_registration_status.rat_mode) {
+		ret = modem_cmd_send_int(data, NULL, cmd_rat_nb, strlen(cmd_rat_nb), &ok_match, 1);
+		if (ret < 0) {
+			goto error;
+		} else {
+			modem_require_restart = true;
+		}
+		if (modem_require_restart) {
+			const char *cmd_restart = (const char *)SET_AIRPLANE_MODE_CMD;
+			ret = modem_cmd_send_int(data, NULL, cmd_restart, strlen(cmd_restart),
+						 &ok_match, 1);
 			if (ret < 0) {
 				goto error;
 			}
-		enum mdm_hl78xx_rat_mode rat_config_request = MDM_RAT_MODE_NONE;
-		#if CONFIG_MODEM_HL78XX_RAT_M1
-				char *cmd_rat_cat = (const char *)SET_RAT_M1_CMD_LEGACY;
-				rat_config_request = MDM_RAT_CAT_M1;
-		#elif CONFIG_MODEM_HL78XX_RAT_NB1
-				const char *cmd_rat_nb = (const char *)SET_RAT_NB1_CMD_LEGACY;
-				rat_config_request = MDM_RAT_NB1;
-		#if CONFIG_MODEM_HL7812
-		#elif CONFIG_MODEM_HL78XX_RAT_GSM
-				char *cmd_rat_gsm = (const char *)SET_RAT_GSM_CMD_LEGACY;
-				rat_config_request = MDM_RAT_GSM;
-		#elif CONFIG_MODEM_HL78XX_RAT_NBNTN
-				char *cmd_rat_nbntn = (const char *)SET_RAT_NBNTN_CMD_LEGACY;
-				rat_config_request = MDM_RAT_NBNTN;
-		#endif
-		#endif
-			if(rat_config_request != data->mdm_registration_status.rat_mode)
-			{	
-				ret = modem_cmd_send_int(data, NULL, cmd_rat_nb, strlen(cmd_rat_nb), &ok_match, 1);
-				if (ret < 0) {
-					goto error;
-				} else {
-					modem_require_restart = true;
-				}
-				if (modem_require_restart) {
-					const char *cmd_restart = (const char *)SET_AIRPLANE_MODE_CMD;
-					ret = modem_cmd_send_int(data, NULL, cmd_restart, strlen(cmd_restart),
-								&ok_match, 1);
-					if (ret < 0) {
-						goto error;
-					}
-					modem_cellular_start_timer(data, K_MSEC(100));
-					return 0;
-				}
-			}
-			
-	#endif
-	modem_cellular_chat_callback_handler(&data->chat, MODEM_CHAT_SCRIPT_RESULT_SUCCESS,
-		data);
+			modem_cellular_start_timer(data, K_MSEC(100));
+			return 0;
+		}
+	}
+
+#endif
+	modem_cellular_chat_callback_handler(&data->chat, MODEM_CHAT_SCRIPT_RESULT_SUCCESS, data);
 	return 0;
-	error:
-	modem_cellular_chat_callback_handler(&data->chat, MODEM_CHAT_SCRIPT_RESULT_ABORT,
-		data);
+error:
+	modem_cellular_chat_callback_handler(&data->chat, MODEM_CHAT_SCRIPT_RESULT_ABORT, data);
 	LOG_ERR("Failed to send command: %d", ret);
 	return ret;
 }
@@ -910,8 +902,8 @@ static void modem_cellular_run_rat_cfg_script_event_handler(struct modem_hl78xx_
 
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_TIMEOUT:
-	LOG_DBG("Rebooting modem to apply new RAT settings");
-			modem_cellular_delegate_event(data, MODEM_HL78XX_EVENT_SCRIPT_REQUIRE_RESTART);
+		LOG_DBG("Rebooting modem to apply new RAT settings");
+		modem_cellular_delegate_event(data, MODEM_HL78XX_EVENT_SCRIPT_REQUIRE_RESTART);
 		break;
 
 	case MODEM_HL78XX_EVENT_SCRIPT_SUCCESS:
@@ -967,26 +959,25 @@ static void modem_cellular_await_power_off_event_handler(struct modem_hl78xx_dat
 static int modem_cellular_on_enable_gprs_state_enter(struct modem_hl78xx_data *data)
 {
 	int ret = 0;
-	char cmd[sizeof("AT+CGDCONT=1,\"\",\"\"") + sizeof(MODEM_HL78XX_ADDRESS_FAMILY) + MDM_APN_MAX_LENGTH];
+	char cmd[sizeof("AT+CGDCONT=1,\"\",\"\"") + sizeof(MODEM_HL78XX_ADDRESS_FAMILY) +
+		 MDM_APN_MAX_LENGTH];
 
-
-	#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_KCONFIG)
-		data->mdm_apn[0] = '\0';
-		strncat(data->mdm_apn, CONFIG_MODEM_HL78XX_APN, sizeof(data->mdm_apn) - 1);
-	#elif defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID) || defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
+#if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_KCONFIG)
+	data->mdm_apn[0] = '\0';
+	strncat(data->mdm_apn, CONFIG_MODEM_HL78XX_APN, sizeof(data->mdm_apn) - 1);
+#elif defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID) || defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
 	/* autodetect APN from IMSI */
 	/* the list of SIM profiles. Global scope, so the app can change it */
 	/* AT+CCID or AT+CIMI needs to be run here if it is not ran in the init script */
-	if(strlen(data->mdm_apn) < 1)
-	{
+	if (strlen(data->mdm_apn) < 1) {
 		LOG_WRN("%d %s APN is left blank", __LINE__, __func__);
 	}
-	#else //defined(CONFIG_MODEM_HL78XX_APN_SOURCE_NETWORK)
-	/* set blank string to get apn from network */
-	#endif
+#else // defined(CONFIG_MODEM_HL78XX_APN_SOURCE_NETWORK)
+/* set blank string to get apn from network */
+#endif
 
-	snprintk(cmd, sizeof(cmd), "AT+CGDCONT=1,\"%s\",\"%s\"", MODEM_HL78XX_ADDRESS_FAMILY, data->mdm_apn);
-
+	snprintk(cmd, sizeof(cmd), "AT+CGDCONT=1,\"%s\",\"%s\"", MODEM_HL78XX_ADDRESS_FAMILY,
+		 data->mdm_apn);
 
 	ret = modem_cmd_send_int(data, NULL, cmd, strlen(cmd), &ok_match, 1);
 	if (ret < 0) {
@@ -1312,7 +1303,8 @@ static void modem_cellular_begin_power_off_pulse(struct modem_hl78xx_data *data)
 	modem_pipe_close_async(data->uart_pipe);
 
 	modem_cellular_enter_state(data, modem_cellular_gpio_is_enabled(&config->mdm_gpio_pwr_on)
-	? MODEM_HL78XX_STATE_POWER_OFF_PULSE : MODEM_HL78XX_STATE_IDLE);
+						 ? MODEM_HL78XX_STATE_POWER_OFF_PULSE
+						 : MODEM_HL78XX_STATE_IDLE);
 }
 
 static int modem_cellular_on_idle_state_enter(struct modem_hl78xx_data *data)
@@ -1439,102 +1431,97 @@ static void modem_cellular_event_handler(struct modem_hl78xx_data *data,
 
 static int hl78xx_init(const struct device *dev)
 {
-    int ret;
+	int ret;
 	struct modem_hl78xx_config *mdm_config = (struct modem_hl78xx_config *)dev->config;
 	struct modem_hl78xx_data *data = (struct modem_hl78xx_data *)dev->data;
-    data->dev = dev;
+	data->dev = dev;
 
-    /* Initialize work queue and event handling */
-    k_work_queue_start(&modem_workq, modem_workq_stack,
-               K_KERNEL_STACK_SIZEOF(modem_workq_stack), K_PRIO_COOP(7), NULL);
-    k_work_init_delayable(&data->timeout_work, modem_cellular_timeout_handler);
-    k_work_init(&data->event_dispatch_work, modem_cellular_event_dispatch_handler);
-    ring_buf_init(&data->event_rb, sizeof(data->event_buf), data->event_buf);
-    k_sem_init(&data->suspended_sem, 0, 1);
-    k_sem_init(&data->script_stopped_sem_tx_int, 0, 1);
-    k_sem_init(&data->script_stopped_sem_rx_int, 0, 1);
-    data->chat_eof_pattern_size = strlen(data->chat_eof_pattern);
+	/* Initialize work queue and event handling */
+	k_work_queue_start(&modem_workq, modem_workq_stack,
+			   K_KERNEL_STACK_SIZEOF(modem_workq_stack), K_PRIO_COOP(7), NULL);
+	k_work_init_delayable(&data->timeout_work, modem_cellular_timeout_handler);
+	k_work_init(&data->event_dispatch_work, modem_cellular_event_dispatch_handler);
+	ring_buf_init(&data->event_rb, sizeof(data->event_buf), data->event_buf);
+	k_sem_init(&data->suspended_sem, 0, 1);
+	k_sem_init(&data->script_stopped_sem_tx_int, 0, 1);
+	k_sem_init(&data->script_stopped_sem_rx_int, 0, 1);
+	data->chat_eof_pattern_size = strlen(data->chat_eof_pattern);
 
-    /* GPIO validation */
-    const struct gpio_dt_spec *gpio_pins[] = {
-        &mdm_config->mdm_gpio_wake,
-        &mdm_config->mdm_gpio_gpio6,
-        &mdm_config->mdm_gpio_reset,
-        &mdm_config->mdm_gpio_vgpio
-    };
+	/* GPIO validation */
+	const struct gpio_dt_spec *gpio_pins[] = {
+		&mdm_config->mdm_gpio_wake, &mdm_config->mdm_gpio_gpio6,
+		&mdm_config->mdm_gpio_reset, &mdm_config->mdm_gpio_vgpio};
 
-    for (int i = 0; i < ARRAY_SIZE(gpio_pins); i++) {
-        if (!gpio_is_ready_dt(gpio_pins[i])) {
-            LOG_ERR("GPIO port (%s) not ready!", gpio_pins[i]->port->name);
-            return -ENODEV;
-        }
-    }
+	for (int i = 0; i < ARRAY_SIZE(gpio_pins); i++) {
+		if (!gpio_is_ready_dt(gpio_pins[i])) {
+			LOG_ERR("GPIO port (%s) not ready!", gpio_pins[i]->port->name);
+			return -ENODEV;
+		}
+	}
 
-    /* GPIO configuration */
-    struct {
-        const struct gpio_dt_spec *spec;
-        gpio_flags_t flags;
-        const char *name;
-    } gpio_config[] = {
-        { &mdm_config->mdm_gpio_reset, GPIO_OUTPUT_LOW, "reset" },
-        { &mdm_config->mdm_gpio_wake, GPIO_OUTPUT_HIGH, "wake" },
+	/* GPIO configuration */
+	struct {
+		const struct gpio_dt_spec *spec;
+		gpio_flags_t flags;
+		const char *name;
+	} gpio_config[] = {{&mdm_config->mdm_gpio_reset, GPIO_OUTPUT_LOW, "reset"},
+			   {&mdm_config->mdm_gpio_wake, GPIO_OUTPUT_HIGH, "wake"},
 #if DT_INST_NODE_HAS_PROP(0, mdm_pwr_on_gpios)
-        { &mdm_config->mdm_gpio_pwr_on, GPIO_OUTPUT_HIGH, "pwr_on" },
+			   {&mdm_config->mdm_gpio_pwr_on, GPIO_OUTPUT_HIGH, "pwr_on"},
 #endif
 #if DT_INST_NODE_HAS_PROP(0, mdm_fast_shutd_gpios)
-        { &mdm_config->mdm_gpio_fast_shtdown, GPIO_OUTPUT_LOW, "fast_shutdown" },
+			   {&mdm_config->mdm_gpio_fast_shtdown, GPIO_OUTPUT_LOW, "fast_shutdown"},
 #endif
 #if DT_INST_NODE_HAS_PROP(0, mdm_uart_dtr_gpios)
-        { &mdm_config->mdm_gpio_uart_dtr, GPIO_OUTPUT, "DTR" },
+			   {&mdm_config->mdm_gpio_uart_dtr, GPIO_OUTPUT, "DTR"},
 #endif
-        { &mdm_config->mdm_gpio_vgpio, GPIO_INPUT, "VGPIO" }
-    };
+			   {&mdm_config->mdm_gpio_vgpio, GPIO_INPUT, "VGPIO"}};
 
-    for (int i = 0; i < ARRAY_SIZE(gpio_config); i++) {
-        ret = gpio_pin_configure_dt(gpio_config[i].spec, gpio_config[i].flags);
-        if (ret < 0) {
-            LOG_ERR("Failed to configure %s pin", gpio_config[i].name);
-            goto error;
-        }
-    }
+	for (int i = 0; i < ARRAY_SIZE(gpio_config); i++) {
+		ret = gpio_pin_configure_dt(gpio_config[i].spec, gpio_config[i].flags);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure %s pin", gpio_config[i].name);
+			goto error;
+		}
+	}
 
-    /* Callback setup */
-    gpio_init_callback(&data->mdm_vgpio_cb, mdm_vgpio_callback_isr,
-               BIT(mdm_config->mdm_gpio_vgpio.pin));
-    ret = gpio_add_callback(mdm_config->mdm_gpio_vgpio.port, &data->mdm_vgpio_cb);
-    if (ret) {
-        LOG_ERR("Cannot setup VGPIO callback! (%d)", ret);
-        goto error;
-    }
-    ret = gpio_pin_interrupt_configure_dt(&mdm_config->mdm_gpio_vgpio, GPIO_INT_EDGE_BOTH);
-    if (ret) {
-        LOG_ERR("Error configuring VGPIO interrupt! (%d)", ret);
-        goto error;
-    }
+	/* Callback setup */
+	gpio_init_callback(&data->mdm_vgpio_cb, mdm_vgpio_callback_isr,
+			   BIT(mdm_config->mdm_gpio_vgpio.pin));
+	ret = gpio_add_callback(mdm_config->mdm_gpio_vgpio.port, &data->mdm_vgpio_cb);
+	if (ret) {
+		LOG_ERR("Cannot setup VGPIO callback! (%d)", ret);
+		goto error;
+	}
+	ret = gpio_pin_interrupt_configure_dt(&mdm_config->mdm_gpio_vgpio, GPIO_INT_EDGE_BOTH);
+	if (ret) {
+		LOG_ERR("Error configuring VGPIO interrupt! (%d)", ret);
+		goto error;
+	}
 
-    (void)hl78xx_init_pipe(dev);
+	(void)hl78xx_init_pipe(dev);
 
-    ret = modem_init_chat(dev);
-    if (ret < 0) {
-        goto error;
-    }
+	ret = modem_init_chat(dev);
+	if (ret < 0) {
+		goto error;
+	}
 
-    modem_hl78xx_socket_init(data);
+	modem_hl78xx_socket_init(data);
 
 #ifndef CONFIG_PM_DEVICE
-    modem_cellular_delegate_event(data, MODEM_HL78XX_EVENT_RESUME);
+	modem_cellular_delegate_event(data, MODEM_HL78XX_EVENT_RESUME);
 #else
-    pm_device_runtime_enable(dev);
+	pm_device_runtime_enable(dev);
 #endif /* CONFIG_PM_DEVICE */
 
-    if (!pm_device_is_powered(dev)) {
-        pm_device_init_off(dev);
-    }
+	if (!pm_device_is_powered(dev)) {
+		pm_device_init_off(dev);
+	}
 
-    return 0;
+	return 0;
 
 error:
-    return ret;
+	return ret;
 }
 
 #ifdef CONFIG_PM_DEVICE
@@ -1577,7 +1564,8 @@ static DEVICE_API(cellular, hl78xx_api) = {
 	// .get_modem_info = nrf91_slm_get_modem_info,
 	// .get_registration_status = nrf91_slm_get_registration_status,
 };
-#define MODEM_HL78XX_DEFINE_INSTANCE(inst, power_ms, reset_ms, startup_ms, shutdown_ms, start, init_script)                                            \
+#define MODEM_HL78XX_DEFINE_INSTANCE(inst, power_ms, reset_ms, startup_ms, shutdown_ms, start,     \
+				     init_script)                                                  \
 	static const struct modem_hl78xx_config hl78xx_cfg_##inst = {                              \
 		.uart = DEVICE_DT_GET(DT_INST_BUS(inst)),                                          \
 		.mdm_gpio_reset = GPIO_DT_SPEC_INST_GET_OR(inst, mdm_reset_gpios, {}),             \
@@ -1593,9 +1581,9 @@ static DEVICE_API(cellular, hl78xx_api) = {
 		.mdm_gpio_sim_switch = GPIO_DT_SPEC_INST_GET_OR(inst, mdm_sim_select_gpios, {}),   \
 		.power_pulse_duration_ms = (power_ms),                                             \
 		.reset_pulse_duration_ms = (reset_ms),                                             \
-		.startup_time_ms  = (startup_ms),                                                  \
+		.startup_time_ms = (startup_ms),                                                   \
 		.shutdown_time_ms = (shutdown_ms),                                                 \
-		.autostarts       = (start),                                                       \
+		.autostarts = (start),                                                             \
 		.init_chat_script = (init_script),                                                 \
 	};                                                                                         \
                                                                                                    \
@@ -1606,13 +1594,13 @@ static DEVICE_API(cellular, hl78xx_api) = {
                                                                                                    \
 	PM_DEVICE_DT_INST_DEFINE(inst, mdm_hl78xx_driver_pm_action);                               \
                                                                                                    \
-DEVICE_DT_INST_DEFINE(inst, hl78xx_init, PM_DEVICE_DT_INST_GET(inst),          \
-					  &hl78xx_data_##inst, &hl78xx_cfg_##inst, POST_KERNEL,             \
-					  CONFIG_MODEM_HL78XX_DEV_INIT_PRIORITY, &hl78xx_api);
-                                                                                                   
+	DEVICE_DT_INST_DEFINE(inst, hl78xx_init, PM_DEVICE_DT_INST_GET(inst), &hl78xx_data_##inst, \
+			      &hl78xx_cfg_##inst, POST_KERNEL,                                     \
+			      CONFIG_MODEM_HL78XX_DEV_INIT_PRIORITY, &hl78xx_api);
 
 #define MODEM_DEVICE_SWIR_HL7812(inst)                                                             \
-	MODEM_HL78XX_DEFINE_INSTANCE(inst, 1500, 100, 100, 5000, false, &swir_hl78xx_init_chat_script)
+	MODEM_HL78XX_DEFINE_INSTANCE(inst, 1500, 100, 100, 5000, false,                            \
+				     &swir_hl78xx_init_chat_script)
 
 #define DT_DRV_COMPAT swir_hl7812
 DT_INST_FOREACH_STATUS_OKAY(MODEM_DEVICE_SWIR_HL7812)

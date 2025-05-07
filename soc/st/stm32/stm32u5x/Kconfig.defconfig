@@ -14,7 +14,7 @@ config ICACHE
 	default y
 
 config DCACHE
-	default y
+	default n
 
 config CACHE_MANAGEMENT
 	default y

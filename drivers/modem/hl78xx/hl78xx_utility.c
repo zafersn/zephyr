@@ -1,9 +1,3 @@
-/*
- * Copyright 2024 
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include <zephyr/modem/chat.h>
 #include <zephyr/modem/backend/uart.h>
 #include <zephyr/kernel.h>
@@ -49,8 +43,10 @@ int modem_atoi(const char *s, const int err_value, const char *desc, const char 
 
 bool modem_cellular_is_registered(struct modem_hl78xx_data *data)
 {
-	return (data->mdm_registration_status.network_state == CELLULAR_REGISTRATION_REGISTERED_HOME) ||
-	       (data->mdm_registration_status.network_state == CELLULAR_REGISTRATION_REGISTERED_ROAMING);
+	return (data->mdm_registration_status.network_state ==
+		CELLULAR_REGISTRATION_REGISTERED_HOME) ||
+	       (data->mdm_registration_status.network_state ==
+		CELLULAR_REGISTRATION_REGISTERED_ROAMING);
 }
 
 #define HASH_MULTIPLIER 37
@@ -141,18 +137,17 @@ int modem_detect_apn(struct modem_hl78xx_data *data, const char *associated_numb
 		*mmcmnc = 0;
 		strncat(mmcmnc, associated_number, sizeof(mmcmnc) - 1);
 		/* try to find a matching IMSI, and assign the APN */
-		rc = find_apn(data->mdm_apn, sizeof(data->mdm_apn), CONFIG_MODEM_HL78XX_APN_PROFILES, mmcmnc);
+		rc = find_apn(data->mdm_apn, sizeof(data->mdm_apn),
+			      CONFIG_MODEM_HL78XX_APN_PROFILES, mmcmnc);
 		if (rc < 0) {
-			rc = find_apn(data->mdm_apn, sizeof(data->mdm_apn), CONFIG_MODEM_HL78XX_APN_PROFILES,
-				      "*");
+			rc = find_apn(data->mdm_apn, sizeof(data->mdm_apn),
+				      CONFIG_MODEM_HL78XX_APN_PROFILES, "*");
 		}
 	}
 
 	if (rc == 0) {
 		LOG_INF("Assign APN: \"%s\"", data->mdm_apn);
-	}
-	else
-	{
+	} else {
 		LOG_INF("No assigned APN: \"%d\"", rc);
 	}
 
