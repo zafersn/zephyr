@@ -76,6 +76,8 @@ static const char *hl78xx_state_str(enum hl78xx_state state)
 		return "power off pulse";
 	case MODEM_HL78XX_STATE_AWAIT_POWER_OFF:
 		return "await power off";
+	default:
+		return "UNKNOWN state";
 	}
 
 	return "";
@@ -630,6 +632,7 @@ static int hl78xx_on_reset_pulse_state_leave(struct hl78xx_data *data)
 static int hl78xx_on_power_on_pulse_state_enter(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
+
 	gpio_pin_set_dt(&config->mdm_gpio_pwr_on, 1);
 	hl78xx_start_timer(data, K_MSEC(config->power_pulse_duration_ms));
 	return 0;
@@ -654,6 +657,7 @@ static void hl78xx_power_on_pulse_event_handler(struct hl78xx_data *data, enum h
 static int hl78xx_on_power_on_pulse_state_leave(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
+
 	gpio_pin_set_dt(&config->mdm_gpio_pwr_on, 0);
 	hl78xx_stop_timer(data);
 	return 0;
@@ -691,6 +695,7 @@ static int hl78xx_on_run_init_script_state_enter(struct hl78xx_data *data)
 static void hl78xx_run_init_script_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
+
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_BUS_OPENED:
 		modem_chat_attach(&data->chat, data->uart_pipe);
@@ -1397,6 +1402,9 @@ static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt
 	case MODEM_HL78XX_STATE_AWAIT_POWER_OFF:
 		hl78xx_await_power_off_event_handler(data, evt);
 		break;
+	default:
+		LOG_ERR("%d %s unknown event", __LINE__, __func__);
+		break;
 	}
 
 	if (state != data->status.state) {
@@ -1586,24 +1594,23 @@ static DEVICE_API(cellular, hl78xx_api) = {
 		.reset_pulse_duration_ms = (reset_ms),                                             \
 		.startup_time_ms = (startup_ms),                                                   \
 		.shutdown_time_ms = (shutdown_ms),                                                 \
-		.autostarts = (start),            					       \
-		.init_chat_script = (init_script),                          \
-	};                                                \
-									\
+		.autostarts = (start),				\
+		.init_chat_script = (init_script),				\
+	};					\
+						\
 	static struct hl78xx_data hl78xx_data_##inst = {		\
-		.buffers.delimiter = "\r\n",         	\
-		.buffers.eof_pattern = EOF_PATTERN,     	\
-	};                                             	 \
-                                                    	\
-	PM_DEVICE_DT_INST_DEFINE(inst, mdm_hl78xx_driver_pm_action); 	 \
-                                                                  		\
-	DEVICE_DT_INST_DEFINE(inst, hl78xx_init, PM_DEVICE_DT_INST_GET(inst), \
-				&hl78xx_data_##inst, &hl78xx_cfg_##inst, POST_KERNEL,     \
+		.buffers.delimiter = "\r\n",					\
+		.buffers.eof_pattern = EOF_PATTERN,				\
+	};			\
+				\
+	PM_DEVICE_DT_INST_DEFINE(inst, mdm_hl78xx_driver_pm_action);		\
+	DEVICE_DT_INST_DEFINE(inst, hl78xx_init, PM_DEVICE_DT_INST_GET(inst),	\
+				&hl78xx_data_##inst, &hl78xx_cfg_##inst, POST_KERNEL,		\
 			      CONFIG_MODEM_HL78XX_DEV_INIT_PRIORITY, &hl78xx_api);
 
-#define MODEM_DEVICE_SWIR_HL78XX(inst)                                   	 \
-	MODEM_HL78XX_DEFINE_INSTANCE(inst, 1500, 100, 100, 5000, false,         	\
-				     &swir_hl78xx_init_chat_script)
+#define MODEM_DEVICE_SWIR_HL78XX(inst)					\
+	MODEM_HL78XX_DEFINE_INSTANCE(inst, 1500, 100, 100,	\
+			5000, false, &swir_hl78xx_init_chat_script)
 
 #define DT_DRV_COMPAT swir_hl7812
 DT_INST_FOREACH_STATUS_OKAY(MODEM_DEVICE_SWIR_HL78XX)

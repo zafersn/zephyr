@@ -465,7 +465,7 @@ static int on_cmd_sockread_common(int socket_id, int socket_data_length, uint16_
 	struct socket_read_data *sock_data;
 	int ret = 0;
 	int packet_size = 0;
-	uint8_t *eof_ptr;
+	const uint8_t *eof_ptr;
 	uint8_t sizeto_eliminate;
 
 	sock = modem_socket_from_fd(&socket_data.socket_config, socket_id);
@@ -927,7 +927,6 @@ exit:
 	k_work_submit(&socket_data.mdata_global->chat.receive_work);
 	socket_data.expected_buf_len = 0;
 	/* clear socket data */
-	sock->data = NULL;
 	return ret;
 }
 
@@ -994,7 +993,7 @@ static int send_data_buffer(const char *buf, const size_t buf_len, int *sock_wri
 		}
 
 		ret = modem_pipe_transmit(socket_data.mdata_global->uart_pipe,
-					  ((uint8_t *)buf) + offset, len);
+					  ((const uint8_t *)buf) + offset, len);
 		if (ret <= 0) {
 			LOG_ERR("Transmit error %d", ret);
 			return -1;
@@ -1345,13 +1344,11 @@ static bool offload_is_supported(int family, int type, int proto)
 	       (proto == IPPROTO_TCP || proto == IPPROTO_UDP);
 }
 
-#define MODEM_HL78XX_DEFINE_INSTANCE(inst)                      	\
-                                                                   	 \
-	NET_DEVICE_OFFLOAD_INIT(inst, "hl78xx_dev", NULL, NULL, &socket_data, NULL, 	\
-				CONFIG_MODEM_HL78XX_OFFLOAD_INIT_PRIORITY, &api_funcs,             	\
-				MDM_MAX_DATA_LENGTH);                                              	\
-																					\
-	NET_SOCKET_OFFLOAD_REGISTER(inst, CONFIG_NET_SOCKETS_OFFLOAD_PRIORITY, AF_UNSPEC, 	\
+#define MODEM_HL78XX_DEFINE_INSTANCE(inst)						\
+	NET_DEVICE_OFFLOAD_INIT(inst, "hl78xx_dev", NULL, NULL, &socket_data, NULL,		\
+				CONFIG_MODEM_HL78XX_OFFLOAD_INIT_PRIORITY,	\
+				&api_funcs, MDM_MAX_DATA_LENGTH);	\
+	NET_SOCKET_OFFLOAD_REGISTER(inst, CONFIG_NET_SOCKETS_OFFLOAD_PRIORITY, AF_UNSPEC,	\
 				    offload_is_supported, offload_socket);
 
 #define MODEM_DEVICE_SWIR_HL78XX(inst) MODEM_HL78XX_DEFINE_INSTANCE(inst)

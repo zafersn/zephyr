@@ -385,7 +385,8 @@ int modem_cmd_send_int(struct hl78xx_data *user_data,
  *
  * @return Pointer to the beginning of the found needle, or NULL if not found.
  */
-void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle, size_t needlelen);
+const void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle,
+		       size_t needlelen);
 
 /**
  * @brief Generate a pseudo-random MAC address based on the modem's IMEI.
@@ -399,17 +400,14 @@ void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle, s
  *
  * @return Pointer to the MAC address buffer.
  */
-static inline uint8_t *modem_get_mac(uint8_t *mac_addr, char *imei);
+static inline uint8_t *modem_get_mac(uint8_t *mac_addr, char *imei)
 {
 	uint32_t hash_value;
-	/* const char *dummy_imei = "111111111111111"; */
-
 	/* Define MAC address prefix */
 	mac_addr[0] = 0x00;
 	mac_addr[1] = 0x10;
 
 	/* Generate MAC address based on IMEI */
-	/* hash_value = hash32(dummy_imei, strlen(dummy_imei)); */
 	hash_value = hash32(imei, strlen(imei));
 	UNALIGNED_PUT(hash_value, (uint32_t *)(mac_addr + 2));
 

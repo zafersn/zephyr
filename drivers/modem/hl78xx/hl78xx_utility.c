@@ -57,9 +57,8 @@ bool hl78xx_is_registered(struct hl78xx_data *data)
 uint32_t hash32(const char *str, int len)
 {
 	uint32_t h = 0;
-	int i;
 
-	for (i = 0; i < len; ++i) {
+	for (int i = 0; i < len; ++i) {
 		h = (h * HASH_MULTIPLIER) + str[i];
 	}
 
@@ -69,7 +68,8 @@ uint32_t hash32(const char *str, int len)
 /**
  * Portable memmem() replacement for C99.
  */
-void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle, size_t needlelen)
+const void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle,
+		       size_t needlelen)
 {
 	if (!haystack || !needle || needlelen == 0 || haystacklen < needlelen) {
 		return NULL;
@@ -79,7 +79,7 @@ void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle, s
 
 	for (size_t i = 0; i <= haystacklen - needlelen; i++) {
 		if (memcmp(h + i, needle, needlelen) == 0) {
-			return (void *)(h + i);
+			return (h + i);
 		}
 	}
 
@@ -118,7 +118,7 @@ int find_apn(char *apn, int apnlen, const char *profiles, const char *associated
 
 		int len = eos - s;
 
-		if (len > 0 && len < apnlen) {
+		if (len > 0 && len < apnlen - 1) {
 			memcpy(apn, s, len);
 			apn[len] = '\0';
 			rc = 0;
@@ -142,7 +142,7 @@ int modem_detect_apn(struct hl78xx_data *data, const char *associated_number)
 #else
 		char mmcmnc[8] = {0};
 #endif
-		*mmcmnc = 0;
+		mmcmnc[0] = '\0';
 		strncat(mmcmnc, associated_number, sizeof(mmcmnc) - 1);
 		/* try to find a matching IMSI, and assign the APN */
 		rc = find_apn(data->identity.apn, sizeof(data->identity.apn),
