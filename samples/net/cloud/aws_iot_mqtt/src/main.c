@@ -19,7 +19,6 @@
 #include <zephyr/logging/log.h>
 #include "net_sample_common.h"
 
-
 #if defined(CONFIG_MBEDTLS_MEMORY_DEBUG)
 #include <mbedtls/memory_buffer_alloc.h>
 #endif
@@ -31,9 +30,9 @@ LOG_MODULE_REGISTER(aws, LOG_LEVEL_DBG);
 #define AWS_BROKER_PORT CONFIG_AWS_MQTT_PORT
 
 #define MQTT_BUFFER_SIZE 256u
-#define APP_BUFFER_SIZE	 4096u
+#define APP_BUFFER_SIZE  4096u
 
-#define MAX_RETRIES	    10u
+#define MAX_RETRIES         10u
 #define BACKOFF_EXP_BASE_MS 1000u
 #define BACKOFF_EXP_MAX_MS  60000u
 #define BACKOFF_CONST_MS    5000u
@@ -49,11 +48,11 @@ static struct mqtt_client client_ctx;
 static const char mqtt_client_name[] = CONFIG_AWS_THING_NAME;
 
 static uint32_t messages_received_counter;
-static bool do_publish;	  /* Trigger client to publish */
+static bool do_publish;   /* Trigger client to publish */
 static bool do_subscribe; /* Trigger client to subscribe */
 
 #if (CONFIG_AWS_MQTT_PORT == 443 && !defined(CONFIG_MQTT_LIB_WEBSOCKET))
-static const char * const alpn_list[] = {"x-amzn-mqtt-ca"};
+static const char *const alpn_list[] = {"x-amzn-mqtt-ca"};
 #endif
 
 #define TLS_TAG_DEVICE_CERTIFICATE 1
@@ -193,8 +192,8 @@ static ssize_t handle_published_message(const struct mqtt_publish_param *pub)
 const char *mqtt_evt_type_to_str(enum mqtt_evt_type type)
 {
 	static const char *const types[] = {
-		"CONNACK", "DISCONNECT", "PUBLISH", "PUBACK",	"PUBREC",
-		"PUBREL",  "PUBCOMP",	 "SUBACK",  "UNSUBACK", "PINGRESP",
+		"CONNACK", "DISCONNECT", "PUBLISH", "PUBACK",   "PUBREC",
+		"PUBREL",  "PUBCOMP",    "SUBACK",  "UNSUBACK", "PINGRESP",
 	};
 
 	return (type < ARRAY_SIZE(types)) ? types[type] : "<unknown>";
@@ -281,7 +280,7 @@ struct backoff_context {
 
 #if defined(CONFIG_AWS_EXPONENTIAL_BACKOFF)
 	uint32_t attempt_max_backoff; /* ms */
-	uint32_t max_backoff;	      /* ms */
+	uint32_t max_backoff;         /* ms */
 #endif
 };
 

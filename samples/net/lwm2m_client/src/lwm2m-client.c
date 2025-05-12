@@ -6,7 +6,7 @@
  */
 
 #define LOG_MODULE_NAME net_lwm2m_client_app
-#define LOG_LEVEL LOG_LEVEL_DBG
+#define LOG_LEVEL       LOG_LEVEL_DBG
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
@@ -22,15 +22,15 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define APP_BANNER "Run LWM2M client"
 
-#define WAIT_TIME	K_SECONDS(10)
-#define CONNECT_TIME	K_SECONDS(10)
+#define WAIT_TIME    K_SECONDS(10)
+#define CONNECT_TIME K_SECONDS(10)
 
-#define CLIENT_MANUFACTURER	"Zephyr"
-#define CLIENT_MODEL_NUMBER	"OMA-LWM2M Sample Client"
-#define CLIENT_SERIAL_NUMBER	"345000123"
-#define CLIENT_FIRMWARE_VER	"1.0"
-#define CLIENT_HW_VER		"1.0.1"
-#define TEMP_SENSOR_UNITS       "Celsius"
+#define CLIENT_MANUFACTURER  "Zephyr"
+#define CLIENT_MODEL_NUMBER  "OMA-LWM2M Sample Client"
+#define CLIENT_SERIAL_NUMBER "345000123"
+#define CLIENT_FIRMWARE_VER  "1.0"
+#define CLIENT_HW_VER        "1.0.1"
+#define TEMP_SENSOR_UNITS    "Celsius"
 
 /* Macros used to subscribe to specific Zephyr NET management events. */
 #if defined(CONFIG_NET_SAMPLE_LWM2M_WAIT_DNS)
@@ -59,8 +59,7 @@ static const char *endpoint =
 	(sizeof(CONFIG_NET_SAMPLE_LWM2M_ID) > 1 ? CONFIG_NET_SAMPLE_LWM2M_ID : CONFIG_BOARD);
 
 #if defined(CONFIG_LWM2M_DTLS_SUPPORT)
-BUILD_ASSERT(sizeof(endpoint) <= CONFIG_LWM2M_SECURITY_KEY_SIZE,
-		"Client ID length is too long");
+BUILD_ASSERT(sizeof(endpoint) <= CONFIG_LWM2M_SECURITY_KEY_SIZE, "Client ID length is too long");
 #endif /* CONFIG_LWM2M_DTLS_SUPPORT */
 
 static struct k_sem quit_lock;
@@ -71,8 +70,7 @@ static struct net_mgmt_event_callback conn_cb;
 
 static K_SEM_DEFINE(network_connected_sem, 0, 1);
 
-static int device_reboot_cb(uint16_t obj_inst_id,
-			    uint8_t *args, uint16_t args_len)
+static int device_reboot_cb(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len)
 {
 	LOG_INF("DEVICE: REBOOT");
 	/* Add an error for testing */
@@ -83,8 +81,7 @@ static int device_reboot_cb(uint16_t obj_inst_id,
 	return 0;
 }
 
-static int device_factory_default_cb(uint16_t obj_inst_id,
-				     uint8_t *args, uint16_t args_len)
+static int device_factory_default_cb(uint16_t obj_inst_id, uint8_t *args, uint16_t args_len)
 {
 	LOG_INF("DEVICE: FACTORY DEFAULT");
 	/* Add an error for testing */
@@ -103,8 +100,7 @@ static int lwm2m_setup(void)
 		{&LWM2M_OBJ(IPSO_OBJECT_TEMP_SENSOR_ID, 0, MAX_RANGE_VALUE_RID), &max_range,
 		 sizeof(max_range)},
 		{&LWM2M_OBJ(IPSO_OBJECT_TEMP_SENSOR_ID, 0, SENSOR_UNITS_RID), TEMP_SENSOR_UNITS,
-		 sizeof(TEMP_SENSOR_UNITS)}
-	};
+		 sizeof(TEMP_SENSOR_UNITS)}};
 
 	/* setup SECURITY object */
 
@@ -158,10 +154,10 @@ static int lwm2m_setup(void)
 			  sizeof(CONFIG_BOARD), LWM2M_RES_DATA_FLAG_RO);
 	lwm2m_set_res_buf(&LWM2M_OBJ(3, 0, 18), CLIENT_HW_VER, sizeof(CLIENT_HW_VER),
 			  sizeof(CLIENT_HW_VER), LWM2M_RES_DATA_FLAG_RO);
-	lwm2m_set_res_buf(&LWM2M_OBJ(3, 0, 20), &bat_status, sizeof(bat_status),
-			  sizeof(bat_status), 0);
-	lwm2m_set_res_buf(&LWM2M_OBJ(3, 0, 21), &mem_total, sizeof(mem_total),
-			  sizeof(mem_total), 0);
+	lwm2m_set_res_buf(&LWM2M_OBJ(3, 0, 20), &bat_status, sizeof(bat_status), sizeof(bat_status),
+			  0);
+	lwm2m_set_res_buf(&LWM2M_OBJ(3, 0, 21), &mem_total, sizeof(mem_total), sizeof(mem_total),
+			  0);
 
 	/* add power source resource instances */
 	lwm2m_create_res_inst(&LWM2M_OBJ(3, 0, 6, 0));
@@ -202,8 +198,7 @@ static int lwm2m_setup(void)
 	return 0;
 }
 
-static void rd_client_event(struct lwm2m_ctx *client,
-			    enum lwm2m_rd_client_event client_event)
+static void rd_client_event(struct lwm2m_ctx *client, enum lwm2m_rd_client_event client_event)
 {
 	switch (client_event) {
 
@@ -275,7 +270,7 @@ static void rd_client_event(struct lwm2m_ctx *client,
 
 static void socket_state(int fd, enum lwm2m_socket_states state)
 {
-	(void) fd;
+	(void)fd;
 	switch (state) {
 	case LWM2M_SOCKET_STATE_ONGOING:
 		LOG_DBG("LWM2M_SOCKET_STATE_ONGOING");
@@ -292,8 +287,7 @@ static void socket_state(int fd, enum lwm2m_socket_states state)
 	}
 }
 
-static void observe_cb(enum lwm2m_observe_event event,
-		       struct lwm2m_obj_path *path, void *user_data)
+static void observe_cb(enum lwm2m_observe_event event, struct lwm2m_obj_path *path, void *user_data)
 {
 	char buf[LWM2M_MAX_PATH_STR_SIZE];
 
@@ -333,8 +327,7 @@ static void on_net_event_l4_connected(void)
 	lwm2m_engine_resume();
 }
 
-static void l4_event_handler(struct net_mgmt_event_callback *cb,
-			     uint32_t event,
+static void l4_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
 			     struct net_if *iface)
 {
 	switch (event) {
@@ -355,8 +348,7 @@ static void l4_event_handler(struct net_mgmt_event_callback *cb,
 	}
 }
 
-static void connectivity_event_handler(struct net_mgmt_event_callback *cb,
-				       uint32_t event,
+static void connectivity_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
 				       struct net_if *iface)
 {
 	if (event == NET_EVENT_CONN_IF_FATAL_ERROR) {
@@ -367,8 +359,9 @@ static void connectivity_event_handler(struct net_mgmt_event_callback *cb,
 
 int main(void)
 {
-	uint32_t flags = IS_ENABLED(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP) ?
-				LWM2M_RD_CLIENT_FLAG_BOOTSTRAP : 0;
+	uint32_t flags = IS_ENABLED(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
+				 ? LWM2M_RD_CLIENT_FLAG_BOOTSTRAP
+				 : 0;
 	int ret;
 
 	LOG_INF(APP_BANNER);
