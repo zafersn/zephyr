@@ -595,4 +595,6 @@ config MODEM_HL78XX_OFFLOAD_INIT_PRIORITY
 	  Do not mess with it unless you know what you are doing.
 	  Make sure offload init priority higher than dev init priority
 
+rsource "hl78xx_evt_monitor/Kconfig.hl78xx_evt_monitor"
+
 endif # MODEM_HL78XX

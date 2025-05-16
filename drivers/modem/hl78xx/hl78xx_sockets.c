@@ -112,7 +112,7 @@ void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state)
 #endif
 	switch (state) {
 	case 1: /* CLOSED */
-		LOG_DBG("Socket %d closed by modem (KSTATEV: 2 1), resetting socket",
+		LOG_DBG("Socket fd: %d closed by modem (KSTATEV: 2 1), resetting socket",
 			socket_data.current_sock_fd);
 		/* Mark socket as closed to block future I/O */
 		/* Free socket resources */

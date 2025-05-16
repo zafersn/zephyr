@@ -12,5 +12,7 @@ zephyr_library_sources(
     hl78xx_apis.c
 )
 
+add_subdirectory_ifdef(CONFIG_HL78XX_EVT_MONITOR hl78xx_evt_monitor)
+
 zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/ip)
 zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/lib/sockets)

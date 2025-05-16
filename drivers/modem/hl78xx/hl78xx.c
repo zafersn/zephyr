@@ -40,10 +40,18 @@ LOG_MODULE_REGISTER(hl78xx_dev, CONFIG_MODEM_LOG_LEVEL);
 K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_HL78XX_RX_WORKQ_STACK_SIZE);
 
 static struct k_work_q modem_workq;
+hl78xx_evt_monitor_handler_t event_dispatcher;
 
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt);
 static int hl78xx_on_idle_state_enter(struct hl78xx_data *data);
 static void hl78xx_begin_power_off_pulse(struct hl78xx_data *data);
+
+static void event_dispatcher_dispatch(struct hl78xx_evt *notif)
+{
+	if (event_dispatcher != NULL) {
+		event_dispatcher(notif);
+	}
+}
 
 static const char *hl78xx_state_str(enum hl78xx_state state)
 {
@@ -220,6 +228,10 @@ static void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc,
 	LOG_DBG("%d %s %d %s:%d", __LINE__, __func__, argc, argv[0], registration_status);
 #endif
 	data->status.registration.network_state = registration_status;
+	struct hl78xx_evt event = {.type = HL78XX_LTE_REGISTRATION_STAT_UPDATE,
+				   .content.reg_status = data->status.registration.network_state};
+
+	event_dispatcher_dispatch(&event);
 
 	if (hl78xx_is_registered(data)) {
 		data->status.registration.is_registered = true;
@@ -339,13 +351,24 @@ static void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc,
 static void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
+	enum hl78xx_cell_rat_mode rat_mode = HL78XX_RAT_MODE_NONE;
 
 	if (argc != 3) {
 		return;
 	}
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("KSTATEV: %s %s %s", argv[0], argv[1], argv[2]);
-	data->status.registration.rat_mode = ATOI(argv[2], 0, "rat_mode");
+#endif
+	rat_mode = ATOI(argv[2], 0, "rat_mode");
+
 	hl78xx_on_kstatev_parser(data, ATOI(argv[1], 0, "status"));
+	if (rat_mode != data->status.registration.rat_mode) {
+		struct hl78xx_evt event = {.type = HL78XX_RAT_UPDATE,
+					   .content.rat_mode = data->status.registration.rat_mode};
+
+		event_dispatcher_dispatch(&event);
+	}
+	data->status.registration.rat_mode = rat_mode;
 }
 
 static void hl78xx_on_udprcv(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
@@ -396,6 +419,12 @@ static void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc,
 	}
 
 	data->status.registration.rat_mode = (uint8_t)atoi(argv[1]);
+
+	struct hl78xx_evt event = {.type = HL78XX_RAT_UPDATE,
+				   .content.rat_mode = data->status.registration.rat_mode};
+
+	event_dispatcher_dispatch(&event);
+
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("KSRAT: %s %s", argv[0], argv[1]);
 #endif
@@ -1782,7 +1811,11 @@ static int hl78xx_driver_pm_action(const struct device *dev, enum pm_device_acti
 	return ret;
 }
 #endif /* CONFIG_PM_DEVICE */
-
+int hl78xx_evt_notif_handler_set(hl78xx_evt_monitor_handler_t handler)
+{
+	event_dispatcher = handler;
+	return 0;
+}
 static DEVICE_API(hl78xx, hl78xx_api) = {
 
 	.get_signal = hl78xx_api_func_get_signal,
