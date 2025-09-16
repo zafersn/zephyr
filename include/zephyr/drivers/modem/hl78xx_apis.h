@@ -38,9 +38,9 @@ extern "C" {
  *	      The default initial state of a monitor is active.
  */
 #define HL78XX_EVT_MONITOR(name, _handler, ...)                                                    \
-	static void _handler(struct hl78xx_evt *);                                                 \
 	static STRUCT_SECTION_ITERABLE(hl78xx_evt_monitor_entry, name) = {                         \
 		.handler = _handler,                                                               \
+		.next = NULL,                                                                      \
 		.flags.direct = false,                                                             \
 		COND_CODE_1(__VA_ARGS__, (.flags.paused = __VA_ARGS__,), ()) }
 
@@ -60,7 +60,8 @@ enum hl78xx_cell_rat_mode {
 	HL78XX_RAT_MODE_NONE,
 	HL78XX_RAT_COUNT = HL78XX_RAT_MODE_NONE
 };
-/*  */
+
+/** Phone functionality modes */
 enum hl78xx_phone_functionality {
 	HL78XX_SIM_POWER_OFF,
 	HL78XX_FULLY_FUNCTIONAL,
@@ -115,10 +116,10 @@ enum hl78xx_registration_status {
 };
 
 enum hl78xx_evt_type {
-	HL78XX_RAT_UPDATE,
+	HL78XX_LTE_RAT_UPDATE,
 	HL78XX_LTE_REGISTRATION_STAT_UPDATE,
 	HL78XX_LTE_SIM_REGISTRATION,
-	HL78XX_LTE_PSMEV,
+	HL78XX_LTE_MODEM_STARTUP,
 };
 
 struct hl78xx_evt {
@@ -127,6 +128,8 @@ struct hl78xx_evt {
 	union {
 		enum hl78xx_registration_status reg_status;
 		enum hl78xx_cell_rat_mode rat_mode;
+		bool status;
+		int value;
 	} content;
 };
 /** API for configuring networks */
@@ -169,11 +172,19 @@ typedef int (*hl78xx_api_send_at_cmd)(const struct device *dev, const char *cmd,
 				      const struct modem_chat_match *response_matches,
 				      uint16_t matches_size);
 
-typedef void (*hl78xx_evt_monitor_handler_t)(struct hl78xx_evt *notif);
+/**< Event monitor entry */
+struct hl78xx_evt_monitor_entry; /* forward declaration */
+/* Event monitor dispatcher */
+typedef void (*hl78xx_evt_monitor_dispatcher_t)(struct hl78xx_evt *notif);
+/* Event monitor handler */
+typedef void (*hl78xx_evt_monitor_handler_t)(struct hl78xx_evt *notif,
+					     struct hl78xx_evt_monitor_entry *mon);
 
 struct hl78xx_evt_monitor_entry {
 	/** Monitor callback. */
 	const hl78xx_evt_monitor_handler_t handler;
+	/* link for runtime list */
+	struct hl78xx_evt_monitor_entry *next;
 	struct {
 		uint8_t paused: 1; /* Monitor is paused. */
 		uint8_t direct: 1; /* Dispatch in ISR. */
@@ -548,8 +559,15 @@ static inline void hl78xx_evt_monitor_resume(struct hl78xx_evt_monitor_entry *mo
  * @retval 0 on success.
  * @retval -EINVAL if the handler parameter is invalid.
  */
-int hl78xx_evt_notif_handler_set(hl78xx_evt_monitor_handler_t handler);
-
+int hl78xx_evt_notif_handler_set(hl78xx_evt_monitor_dispatcher_t handler);
+/**
+ * @brief Register an event monitor to receive HL78xx modem event notifications.
+ */
+int hl78xx_evt_monitor_register(struct hl78xx_evt_monitor_entry *mon);
+/**
+ * @brief Unregister an event monitor from receiving HL78xx modem event notifications.
+ */
+int hl78xx_evt_monitor_unregister(struct hl78xx_evt_monitor_entry *mon);
 #ifdef __cplusplus
 }
 #endif

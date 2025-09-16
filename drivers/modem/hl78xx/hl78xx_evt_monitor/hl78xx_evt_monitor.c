@@ -8,6 +8,7 @@
 #include <zephyr/device.h>
 #include <zephyr/toolchain.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/spinlock.h>
 #include <zephyr/drivers/modem/hl78xx_apis.h>
 
 LOG_MODULE_REGISTER(hl78xx_evt_monitor, CONFIG_HL78XX_EVT_MONITOR_LOG_LEVEL);
@@ -16,6 +17,9 @@ struct evt_notif_fifo {
 	void *fifo_reserved;
 	struct hl78xx_evt data;
 };
+
+static struct hl78xx_evt_monitor_entry *monitor_list_head;
+static struct k_spinlock monitor_list_lock;
 
 static void hl78xx_evt_monitor_task(struct k_work *work);
 
@@ -33,6 +37,35 @@ static bool is_direct(const struct hl78xx_evt_monitor_entry *mon)
 	return mon->flags.direct;
 }
 
+/* Register an event monitor */
+int hl78xx_evt_monitor_register(struct hl78xx_evt_monitor_entry *mon)
+{
+	k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+	mon->next = monitor_list_head;
+	monitor_list_head = mon;
+	k_spin_unlock(&monitor_list_lock, key);
+	return 0;
+}
+
+/* Unregister an event monitor */
+int hl78xx_evt_monitor_unregister(struct hl78xx_evt_monitor_entry *mon)
+{
+	k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+	struct hl78xx_evt_monitor_entry **pp = &monitor_list_head;
+
+	while (*pp) {
+		if (*pp == mon) {
+			*pp = mon->next;
+			mon->next = NULL;
+			k_spin_unlock(&monitor_list_lock, key);
+			return 0;
+		}
+		pp = &(*pp)->next;
+	}
+
+	k_spin_unlock(&monitor_list_lock, key);
+	return -ENOENT;
+}
 /* Dispatch EVT notifications immediately, or schedules a workqueue task to do that.
  * Keep this function public so that it can be called by tests.
  * This function is called from an ISR.
@@ -46,17 +79,28 @@ void hl78xx_evt_monitor_dispatch(struct hl78xx_evt *notif)
 	__ASSERT_NO_MSG(notif != NULL);
 
 	monitored = false;
+	/* Global monitors: SECTION_ITERABLE */
 	STRUCT_SECTION_FOREACH(hl78xx_evt_monitor_entry, e) {
 		if (!is_paused(e)) {
 			if (is_direct(e)) {
-				LOG_DBG("Dispatching to %p (ISR)", e->handler);
-				e->handler(notif);
+				e->handler(notif, NULL); /* NULL context for global listeners */
 			} else {
-				/* Copy and schedule work-queue task */
 				monitored = true;
 			}
 		}
 	}
+
+	k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+	for (struct hl78xx_evt_monitor_entry *e = monitor_list_head; e; e = e->next) {
+		if (!is_paused(e)) {
+			if (is_direct(e)) {
+				e->handler(notif, e);
+			} else {
+				monitored = true;
+			}
+		}
+	}
+	k_spin_unlock(&monitor_list_lock, key);
 
 	if (!monitored) {
 		/* Only copy monitored notifications to save heap */
@@ -88,9 +132,18 @@ static void hl78xx_evt_monitor_task(struct k_work *work)
 		STRUCT_SECTION_FOREACH(hl78xx_evt_monitor_entry, e) {
 			if (!is_paused(e) && !is_direct(e)) {
 				LOG_DBG("Dispatching to %p", e->handler);
-				e->handler(&evt_notif->data);
+				e->handler(&evt_notif->data, e);
 			}
 		}
+		/* Instance/context monitors */
+		k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+		for (struct hl78xx_evt_monitor_entry *e = monitor_list_head; e; e = e->next) {
+			if (!is_paused(e) && !is_direct(e)) {
+				e->handler(&evt_notif->data, e);
+			}
+		}
+		k_spin_unlock(&monitor_list_lock, key);
+
 		k_heap_free(&hl78xx_evt_monitor_heap, evt_notif);
 	}
 }

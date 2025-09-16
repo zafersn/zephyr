@@ -16,3 +16,4 @@ add_subdirectory_ifdef(CONFIG_HL78XX_EVT_MONITOR hl78xx_evt_monitor)
 
 zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/ip)
 zephyr_library_include_directories(${ZEPHYR_BASE}/subsys/net/lib/sockets)
+zephyr_library_include_directories_ifdef(CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS ${ZEPHYR_BASE}/subsys/net/lib/tls_credentials)

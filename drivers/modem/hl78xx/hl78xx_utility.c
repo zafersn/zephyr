@@ -53,8 +53,8 @@ int modem_atoi(const char *s, const int err_value, const char *desc, const char 
 
 bool hl78xx_is_registered(struct hl78xx_data *data)
 {
-	return (data->status.registration.network_state == HL78XX_REGISTRATION_REGISTERED_HOME) ||
-	       (data->status.registration.network_state == HL78XX_REGISTRATION_REGISTERED_ROAMING);
+	return (data->status.registration.network_state_current == HL78XX_REGISTRATION_REGISTERED_HOME) ||
+	       (data->status.registration.network_state_current == HL78XX_REGISTRATION_REGISTERED_ROAMING);
 }
 
 #define HASH_MULTIPLIER 37

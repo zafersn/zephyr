@@ -54,6 +54,8 @@
 #define MDM_IMSI_LENGTH         23
 #define MDM_ICCID_LENGTH        22
 #define MDM_APN_MAX_LENGTH      64
+#define MDM_MAX_CERT_LENGTH     4096
+#define MDM_MAX_HOSTNAME_LEN    128
 
 #define ADDRESS_FAMILY_IP         "IP"
 #define ADDRESS_FAMILY_IP4        "IPV4"
@@ -76,10 +78,11 @@
 #endif
 
 /* Modem Communication Patterns */
-#define EOF_PATTERN      "--EOF--Pattern--"
-#define EOF_PATTERN_GNSS "+++"
-#define CONNECT_STRING   "CONNECT"
-#define OK_STRING	"OK"
+#define EOF_PATTERN         "--EOF--Pattern--"
+#define TERMINATION_PATTERN "+++"
+#define CONNECT_STRING      "CONNECT"
+#define CME_ERROR_STRING    "+CME ERROR: "
+#define OK_STRING           "OK"
 
 /* RAT (Radio Access Technology) commands */
 #define SET_RAT_M1_CMD_LEGACY    "AT+KSRAT=0"
@@ -100,7 +103,10 @@
 #define SET_AIRPLANE_MODE_CMD              "AT+CFUN=4,1"
 #define SET_FULLFUNCTIONAL_MODE_CMD_LEGACY "AT+CFUN=1,0"
 #define SET_FULLFUNCTIONAL_MODE_CMD        "AT+CFUN=1,1"
+#define SET_SIM_PWR_OFF_MODE_CMD           "AT+CFUN=0"
 #define GET_FULLFUNCTIONAL_MODE_CMD        "AT+CFUN?"
+#define MDM_POWER_OFF_CMD_LEGACY           "AT+CPWROFF"
+#define MDM_POWER_FAST_OFF_CMD_LEGACY      "AT+CPWROFF=1"
 /* PDP Context commands */
 #define DEACTIVATE_PDP_CONTEXT             "AT+CGACT=0"
 #define ACTIVATE_PDP_CONTEXT               "AT+CGACT=1"
@@ -109,30 +115,6 @@
 #define ATOI(s_, value_, desc_) modem_atoi(s_, value_, desc_, __func__)
 
 /* Enums */
-
-enum hl78xx_gnss_event {
-	HL78XX_GNSS_EVENT_INVALID = -1,
-	HL78XX_GNSS_EVENT_INIT,
-	HL78XX_GNSS_EVENT_START,
-	HL78XX_GNSS_EVENT_STOP,
-	HL78XX_GNSS_EVENT_POSITION,
-};
-
-enum hl78xx_gnss_status {
-	HL78XX_GNSS_STATUS_INVALID = -1,
-	HL78XX_GNSS_STATUS_FAILURE,
-	HL78XX_GNSS_STATUS_SUCCESS,
-};
-
-enum hl78xx_gnss_position_event {
-	HL78XX_GNSS_POSITION_EVENT_INVALID = -1,
-	HL78XX_GNSS_POSITION_EVENT_LOST_OR_NOT_AVAILABLE_YET,
-	HL78XX_GNSS_POSITION_EVENT_PREDICTION_AVAILABLE,
-	HL78XX_GNSS_POSITION_EVENT_2D_AVAILABLE,
-	HL78XX_GNSS_POSITION_EVENT_3D_AVAILABLE,
-	HL78XX_GNSS_POSITION_EVENT_FIXED_TO_INVALID,
-	HL78XX_GNSS_POSITION_EVENT_SATELLITE_TIMEOUT,
-};
 
 enum hl78xx_state {
 	MODEM_HL78XX_STATE_IDLE = 0,
@@ -177,12 +159,33 @@ enum hl78xx_event {
 	MODEM_HL78XX_EVENT_BUS_CLOSED,
 	MODEM_HL78XX_EVENT_SOCKET_READY,
 };
+
+enum hl78xx_tcp_notif {
+	TCP_NOTIF_NETWORK_ERROR = 0,
+	TCP_NOTIF_NO_MORE_SOCKETS = 1,
+	TCP_NOTIF_MEMORY_PROBLEM = 2,
+	TCP_NOTIF_DNS_ERROR = 3,
+	TCP_NOTIF_REMOTE_DISCONNECTION = 4,
+	TCP_NOTIF_CONNECTION_ERROR = 5,
+	TCP_NOTIF_GENERIC_ERROR = 6,
+	TCP_NOTIF_ACCEPT_FAILED = 7,
+	TCP_NOTIF_SEND_MISMATCH = 8,
+	TCP_NOTIF_BAD_SESSION_ID = 9,
+	TCP_NOTIF_SESSION_ALREADY_RUNNING = 10,
+	TCP_NOTIF_ALL_SESSIONS_USED = 11,
+	TCP_NOTIF_CONNECTION_TIMEOUT = 12,
+	TCP_NOTIF_SSL_CONNECTION_ERROR = 13,
+	TCP_NOTIF_SSL_INIT_ERROR = 14,
+	TCP_NOTIF_SSL_CERT_ERROR = 15
+};
+
 struct kselacq_syntax {
 	bool mode;
 	enum hl78xx_cell_rat_mode rat1;
 	enum hl78xx_cell_rat_mode rat2;
 	enum hl78xx_cell_rat_mode rat3;
 };
+
 struct kband_syntax {
 	uint8_t rat;
 	/* Max 64 digits representation format is supported
@@ -195,9 +198,17 @@ struct kband_syntax {
 	uint8_t bnd_bitmap[MDM_BAND_HEX_STR_LEN];
 };
 
+struct apn_state {
+	bool refresh_requested_previously;
+	bool refresh_requested_currently;
+	bool refresh_status_currently;
+	bool refresh_status_previously;
+};
 struct registration_status {
-	bool is_registered;
-	enum hl78xx_registration_status network_state;
+	bool is_registered_currently;
+	bool is_registered_previously;
+	enum hl78xx_registration_status network_state_current;
+	enum hl78xx_registration_status network_state_previous;
 	enum hl78xx_cell_rat_mode rat_mode;
 };
 /* driver data */
@@ -210,6 +221,8 @@ struct modem_buffers {
 	uint8_t *argv[32];
 	uint8_t *eof_pattern;
 	uint8_t eof_pattern_size;
+	uint8_t *termination_pattern;
+	uint8_t termination_pattern_size;
 };
 
 struct modem_identity {
@@ -221,18 +234,23 @@ struct modem_identity {
 	uint8_t fw_version[MDM_REVISION_LENGTH];
 	char apn[MDM_APN_MAX_LENGTH];
 };
+struct hl78xx_phone_functionality_work {
+	enum hl78xx_phone_functionality functionality;
+	bool in_progress;
+};
 
 struct modem_status {
 	struct registration_status registration;
-	uint8_t rssi;
+	int16_t rssi;
 	uint8_t ksrep;
-	uint8_t rsrp;
-	uint8_t rsrq;
+	int16_t rsrp;
+	int16_t rsrq;
 	uint16_t script_fail_counter;
 	int variant;
 	enum hl78xx_state state;
 	struct kband_syntax kbndcfg[HL78XX_RAT_COUNT];
-	enum hl78xx_phone_functionality phone_functionality;
+	struct hl78xx_phone_functionality_work phone_functionality;
+	struct apn_state apn_state;
 };
 
 struct modem_gpio_callbacks {
@@ -296,6 +314,7 @@ struct hl78xx_config {
 	bool autostarts;
 
 	const struct modem_chat_script *init_chat_script;
+	const struct modem_chat_script *periodic_chat_script;
 };
 /* socket read callback data */
 struct socket_read_data {
@@ -380,7 +399,27 @@ void hl78xx_socket_init(struct hl78xx_data *data);
  * @param socket_id ID of the affected socket.
  * @param new_total New data count or buffer level associated with the socket.
  */
-void socknotifydata(int socket_id, int new_total);
+void socket_notify_data(int socket_id, int new_total);
+
+/**
+ * @brief Notify the system of tcp socket changes.
+ *
+ * Typically used when tcp connection failure has been received on a socket.
+ *
+ * @param socket_id ID of the affected socket.
+ * @param tcp_notif Integer type. Indicates the cause of the TCP connection failure.
+ */
+void tcp_notify_data(int socket_id, int tcp_notif);
+
+/**
+ * @brief Notify the system of tcp socket changes.
+ *
+ * Typically used when tcp connection failure has been received on a socket.
+ *
+ * @param socket_id ID of the affected socket.
+ * @param tcp_notif Integer type. Indicates the cause of the TCP connection failure.
+ */
+void tcp_notify_data(int socket_id, int tcp_notif);
 
 /**
  * @brief Send a command to the modem and wait for matching response(s).
@@ -485,6 +524,7 @@ int modem_detect_apn(struct hl78xx_data *data, const char *associated_number);
  */
 int hl78xx_get_band_default_config_for_rat(enum hl78xx_cell_rat_mode rat, char *hex_bndcfg,
 					   size_t size_in_bytes);
+
 /**
  * @brief Trim leading zeros from a hexadecimal string.
  *
@@ -497,6 +537,7 @@ int hl78xx_get_band_default_config_for_rat(enum hl78xx_cell_rat_mode rat, char *
  *         or the last zero if the string is all zeros.
  */
 const char *hl78xx_trim_leading_zeros(const char *hex_str);
+
 /**
  * @brief Convert a binary bitmap to a trimmed hexadecimal string.
  *
@@ -508,6 +549,7 @@ const char *hl78xx_trim_leading_zeros(const char *hex_str);
  * @param hex_str_len Size of the output buffer in bytes.
  */
 void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, size_t hex_str_len);
+
 /**
  * @brief Convert a hexadecimal string to a binary bitmap.
  *
@@ -521,38 +563,126 @@ void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, s
  */
 int hl78xx_hex_string_to_bitmap(const char *hex_str, uint8_t *bitmap_out);
 
+/**
+ * @brief Extract the essential part of an APN string.
+ *
+ * This function extracts the essential part of an APN (Access Point Name)
+ * string by removing any unnecessary prefixes or suffixes.
+ *
+ * @param full_apn The full APN string to extract from.
+ * @param essential_apn Buffer to store the extracted essential APN.
+ * @param max_len Maximum length of the essential APN buffer.
+ */
 void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn, size_t max_len);
 
+/**
+ * @brief hl78xx_set_apn_internal - Brief description of the function.
+ * @param data Description of data.
+ * @param apn Description of apn.
+ * @param size Description of size.
+ * @return int Description of return value.
+ */
 int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size);
 
+/**
+ * @brief hl78xx_api_func_set_phone_functionality - Brief description of the function.
+ * @param dev Description of dev.
+ * @param functionality Description of functionality.
+ * @param reset Description of reset.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_set_phone_functionality(const struct device *dev,
 					    enum hl78xx_phone_functionality functionality,
 					    bool reset);
 
+/**
+ * @brief hl78xx_api_func_get_phone_functionality - Brief description of the function.
+ * @param dev Description of dev.
+ * @param functionality Description of functionality.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_get_phone_functionality(const struct device *dev,
 					    enum hl78xx_phone_functionality *functionality);
 
+/**
+ * @brief hl78xx_api_func_get_signal - Brief description of the function.
+ * @param dev Description of dev.
+ * @param type Description of type.
+ * @param value Description of value.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_get_signal(const struct device *dev, const enum hl78xx_signal_type type,
 			       int16_t *value);
 
+/**
+ * @brief hl78xx_api_func_get_registration_status - Brief description of the function.
+ * @param dev Description of dev.
+ * @param tech Description of tech.
+ * @param status Description of status.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_get_registration_status(const struct device *dev,
 					    enum hl78xx_cell_rat_mode *tech,
 					    enum hl78xx_registration_status *status);
 
+/**
+ * @brief hl78xx_api_func_get_modem_info - Brief description of the function.
+ * @param dev Description of dev.
+ * @param type Description of type.
+ * @param info Description of info.
+ * @param size Description of size.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_get_modem_info(const struct device *dev, enum hl78xx_modem_info_type type,
 				   char *info, size_t size);
 
+/**
+ * @brief hl78xx_api_func_set_apn - Brief description of the function.
+ * @param dev Description of dev.
+ * @param apn Description of apn.
+ * @param size Description of size.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_set_apn(const struct device *dev, const char *apn, uint16_t size);
 
+/**
+ * @brief hl78xx_api_func_modem_cmd_send_int - Brief description of the function.
+ * @param dev Description of dev.
+ * @param cmd Description of cmd.
+ * @param cmd_size Description of cmd_size.
+ * @param response_matches Description of response_matches.
+ * @param matches_size Description of matches_size.
+ * @return int Description of return value.
+ */
 int hl78xx_api_func_modem_cmd_send_int(const struct device *dev, const char *cmd, uint16_t cmd_size,
 				       const struct modem_chat_match *response_matches,
 				       uint16_t matches_size);
 
+/**
+ * @brief hl78xx_enter_state - Brief description of the function.
+ * @param data Description of data.
+ * @param state Description of state.
+ */
 void hl78xx_enter_state(struct hl78xx_data *data, enum hl78xx_state state);
 
+/**
+ * @brief hl78xx_delegate_event - Brief description of the function.
+ * @param data Description of data.
+ * @param evt Description of evt.
+ */
 void hl78xx_delegate_event(struct hl78xx_data *data, enum hl78xx_event evt);
 
+/**
+ * @brief notif_carrier_off - Brief description of the function.
+ * @param void Description of void.
+ */
 void notif_carrier_off(void);
+
+/**
+ * @brief check_if_any_socket_connected - Brief description of the function.
+ * @param void Description of void.
+ * @return int Description of return value.
+ */
 int check_if_any_socket_connected(void);
 
 #endif /* HL78XX_H */
