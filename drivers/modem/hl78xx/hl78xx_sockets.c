@@ -28,9 +28,6 @@
 LOG_MODULE_REGISTER(hl78xx_socket, CONFIG_MODEM_LOG_LEVEL);
 
 /* Helper macros and constants */
-#define CGCONTRDP_RESPONSE_NUM_DELIMS 7
-#define MDM_IP_INFO_RESP_SIZE         256
-
 #define MODEM_STREAM_STARTER_WORD "\r\n" CONNECT_STRING "\r\n"
 #define MODEM_STREAM_END_WORD     "\r\n" OK_STRING "\r\n"
 
@@ -59,6 +56,14 @@ struct hl78xx_ipv4_info {
 	struct in_addr new_addr;
 };
 
+#ifdef CONFIG_NET_IPV6
+struct hl78xx_ipv6_info {
+	struct in6_addr addr;
+	struct in6_addr subnet;
+	struct in6_addr gateway;
+	struct in6_addr new_addr;
+};
+#endif
 struct hl78xx_tls_info {
 	char hostname[MDM_MAX_HOSTNAME_LEN];
 	bool hostname_set;
@@ -96,7 +101,9 @@ struct hl78xx_socket_data {
 
 	struct hl78xx_dns_info dns;
 	struct hl78xx_ipv4_info ipv4;
-
+#ifdef CONFIG_NET_IPV6
+	struct hl78xx_ipv6_info ipv6;
+#endif
 	/* rx net buffer */
 	struct ring_buf *buf_pool;
 	uint32_t expected_buf_len;
@@ -119,11 +126,8 @@ struct receive_socket_data {
 	uint16_t len;
 };
 
-uint8_t *buf_argv[32];
 struct work_socket_data work_buf;
 struct receive_socket_data receive_buf;
-
-uint16_t match_len;
 
 bool match_connect_found;
 bool match_eof_ok_found;
@@ -223,7 +227,7 @@ bool is_valid_ipv4_addr(struct in_addr *addr)
 	return addr && (addr->s_addr != 0);
 }
 
-static void set_iface(bool is_ipv4, struct in6_addr *new_ipv6_addr, struct in6_addr *ipv6Addr)
+static void set_iface(bool is_ipv4)
 {
 	if (!socket_data.net_iface) {
 		LOG_DBG("No network interface set. Skipping iface config.");
@@ -252,10 +256,10 @@ static void set_iface(bool is_ipv4, struct in6_addr *new_ipv6_addr, struct in6_a
 #endif
 	} else {
 #ifdef CONFIG_NET_IPV6
-		net_if_ipv6_addr_rm(socket_data.net_iface, ipv6Addr);
+		net_if_ipv6_addr_rm(socket_data.net_iface, &socket_data.ipv6.addr);
 
-		if (!net_if_ipv6_addr_add(socket_data.net_iface, new_ipv6_addr, NET_ADDR_AUTOCONF,
-					  0)) {
+		if (!net_if_ipv6_addr_add(socket_data.net_iface, &socket_data.ipv6.new_addr,
+					  NET_ADDR_AUTOCONF, 0)) {
 			LOG_ERR("Failed to set IPv6 interface address.");
 		} else {
 			LOG_DBG("IPv6 interface configuration complete.");
@@ -454,11 +458,6 @@ static void hl78xx_on_cgdcontrdp(struct modem_chat *chat, char **argv, uint16_t 
 	LOG_INF("Extracted IP: %s", ip_addr);
 	LOG_INF("Extracted Subnet: %s", subnet_mask);
 
-#ifdef CONFIG_NET_IPV6
-	struct in6_addr new_ipv6_addr = {0};
-	struct in6_addr ipv6Addr = {0};
-#endif
-
 	if (is_ipv4) {
 		if (!parse_ip(true, ip_addr, &socket_data.ipv4.new_addr)) {
 			return;
@@ -471,7 +470,7 @@ static void hl78xx_on_cgdcontrdp(struct modem_chat *chat, char **argv, uint16_t 
 		}
 	} else {
 #ifdef CONFIG_NET_IPV6
-		if (!parse_ip(false, ip_addr, &new_ipv6_addr)) {
+		if (!parse_ip(false, ip_addr, &socket_data.ipv6.new_addr)) {
 			return;
 		}
 #endif
@@ -482,9 +481,9 @@ static void hl78xx_on_cgdcontrdp(struct modem_chat *chat, char **argv, uint16_t 
 	}
 
 #ifdef CONFIG_NET_IPV6
-	set_iface(is_ipv4, &new_ipv6_addr, &ipv6Addr);
+	set_iface(is_ipv4);
 #else
-	set_iface(is_ipv4, NULL, NULL);
+	set_iface(is_ipv4);
 #endif
 }
 
@@ -499,7 +498,7 @@ static void hl78xx_on_ktcpstate(struct modem_chat *chat, char **argv, uint16_t a
 #endif
 	uint8_t tcp_session_id = ATOI(argv[1], 0, "tcp_session_id");
 	uint8_t tcp_status = ATOI(argv[2], 0, "tcp_status");
-	int8_t tcp_notif = ATOI(argv[3], -1, "tcp_notif");
+	int8_t tcp_notif = ATOI(argv[3], 0, "tcp_notif");
 	uint16_t rcv_data = ATOI(argv[5], 0, "tcp_rcv_data");
 
 	if (tcp_status != 3 && tcp_notif != -1) {
@@ -804,7 +803,7 @@ void dns_work_cb(void)
 	bool retry = false;
 	const char *const dns_servers_str[DNS_SERVERS_COUNT] = {
 #ifdef CONFIG_NET_IPV6
-		socket_data.dns_v6_string,
+		socket_data.dns.v6_string,
 #endif
 #ifdef CONFIG_NET_IPV4
 		socket_data.dns.v4_string,
@@ -813,14 +812,14 @@ void dns_work_cb(void)
 	const char *dns_servers_wrapped[ARRAY_SIZE(dns_servers_str)];
 
 #ifdef CONFIG_NET_IPV6
-	valid_address = net_ipaddr_parse(socket_data.dns_v6_string,
-					 strlen(socket_data.dns_v6_string), &temp_addr);
+	valid_address = net_ipaddr_parse(socket_data.dns.v6_string,
+					 strlen(socket_data.dns.v6_string), &temp_addr);
 	if (!valid_address && IS_ENABLED(CONFIG_NET_IPV4)) {
 		/* IPv6 DNS string is not valid, replace it with IPv4 address and recheck */
-		strncpy(socket_data.dns_v6_string, socket_data.dns_v4_string,
-			sizeof(socket_data.dns_v4_string) - 1);
-		valid_address = net_ipaddr_parse(socket_data.dns_v6_string,
-						 strlen(socket_data.dns_v6_string), &temp_addr);
+		strncpy(socket_data.dns.v6_string, socket_data.dns.v4_string,
+			sizeof(socket_data.dns.v4_string) - 1);
+		valid_address = net_ipaddr_parse(socket_data.dns.v6_string,
+						 strlen(socket_data.dns.v6_string), &temp_addr);
 	}
 #else
 	valid_address = net_ipaddr_parse(socket_data.dns.v4_string,
@@ -867,7 +866,6 @@ static int on_cmd_sockread_common(int socket_id, uint16_t socket_data_length, ui
 	struct modem_socket *sock;
 	struct socket_read_data *sock_data;
 	int ret = 0;
-	int packet_size = 0;
 
 	sock = modem_socket_from_fd(&socket_data.socket_config, socket_id);
 	if (!sock) {
@@ -920,7 +918,7 @@ static int on_cmd_sockread_common(int socket_id, uint16_t socket_data_length, ui
 	sock_data->recv_read_len = len;
 
 	/* Remove packet from list */
-	packet_size = modem_socket_next_packet_size(&socket_data.socket_config, sock);
+	modem_socket_next_packet_size(&socket_data.socket_config, sock);
 	modem_socket_packet_size_update(&socket_data.socket_config, sock, -socket_data_length);
 	socket_data.collected_buf_len = 0;
 
