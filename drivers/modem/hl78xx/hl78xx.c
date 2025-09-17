@@ -442,7 +442,7 @@ static void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint1
 	LOG_DBG("%d %d %d", __LINE__, socket_id, new_total);
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 
-	socket_notify_data(socket_id, new_total);
+	socket_notify_data(socket_id, new_total, user_data);
 }
 
 /** +KTCP_NOTIF: <session_id>, <tcp_notif> */
@@ -465,7 +465,7 @@ static void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t a
 		return;
 	}
 
-	tcp_notify_data(socket_id, tcp_notif);
+	tcp_notify_data(socket_id, tcp_notif, user_data);
 }
 
 static void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
@@ -754,7 +754,7 @@ int modem_cmd_send_int(struct hl78xx_data *data, modem_chat_script_callback scri
 		}
 		return -1;
 	}
-	
+
 	return ret;
 }
 
@@ -1424,7 +1424,7 @@ static void hl78xx_carrier_on_event_handler(struct hl78xx_data *data, enum hl78x
 	case MODEM_HL78XX_EVENT_SCRIPT_FAILED:
 		break;
 	case MODEM_HL78XX_EVENT_TIMEOUT:
-		dns_work_cb();
+		dns_work_cb(data->dev);
 		break;
 	case MODEM_HL78XX_EVENT_DEREGISTERED:
 		hl78xx_enter_state(data, MODEM_HL78XX_STATE_AWAIT_REGISTERED);
@@ -1446,11 +1446,11 @@ static int hl78xx_on_carrier_on_state_leave(struct hl78xx_data *data)
 
 static int hl78xx_on_carrier_off_state_enter(struct hl78xx_data *data)
 {
-	notif_carrier_off();
+	notif_carrier_off(data->dev);
 	/* Check whether or not there is any sockets are connected,
 	 * if true, wait until sockets are closed properly
 	 */
-	if (check_if_any_socket_connected() == false) {
+	if (check_if_any_socket_connected(data->dev) == false) {
 		hl78xx_start_timer(data, K_MSEC(100));
 	}
 	return 0;

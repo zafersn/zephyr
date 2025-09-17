@@ -356,10 +356,11 @@ uint32_t hash32(const char *str, int len);
 
 /**
  * @brief DNS resolution work callback.
- *
+ * 
+ * @param dev Pointer to the device structure.
  * Should be used internally to handle DNS resolution events.
  */
-void dns_work_cb(void);
+void dns_work_cb(const struct device *dev);
 
 /**
  * @brief Callback to update and handle network interface status.
@@ -403,8 +404,9 @@ int modem_atoi(const char *s, const int err_value, const char *desc, const char 
  *
  * @param socket_id ID of the affected socket.
  * @param new_total New data count or buffer level associated with the socket.
+ * @param user_data Pointer to user data associated with the notification.
  */
-void socket_notify_data(int socket_id, int new_total);
+void socket_notify_data(int socket_id, int new_total, void *user_data);
 
 /**
  * @brief Notify the system of tcp socket changes.
@@ -413,18 +415,9 @@ void socket_notify_data(int socket_id, int new_total);
  *
  * @param socket_id ID of the affected socket.
  * @param tcp_notif Integer type. Indicates the cause of the TCP connection failure.
+ * @param user_data Pointer to user data associated with the notification.
  */
-void tcp_notify_data(int socket_id, int tcp_notif);
-
-/**
- * @brief Notify the system of tcp socket changes.
- *
- * Typically used when tcp connection failure has been received on a socket.
- *
- * @param socket_id ID of the affected socket.
- * @param tcp_notif Integer type. Indicates the cause of the TCP connection failure.
- */
-void tcp_notify_data(int socket_id, int tcp_notif);
+void tcp_notify_data(int socket_id, int tcp_notif, void *user_data);
 
 /**
  * @brief Send a command to the modem and wait for matching response(s).
@@ -679,15 +672,21 @@ void hl78xx_delegate_event(struct hl78xx_data *data, enum hl78xx_event evt);
 
 /**
  * @brief notif_carrier_off - Brief description of the function.
- * @param void Description of void.
+ * @param dev Description of dev.
  */
-void notif_carrier_off(void);
+void notif_carrier_off(const struct device *dev);
+
+/**
+ * @brief notif_carrier_on - Brief description of the function.
+ * @param dev Description of dev.
+ */
+void notif_carrier_on(const struct device *dev);
 
 /**
  * @brief check_if_any_socket_connected - Brief description of the function.
- * @param void Description of void.
+ * @param dev Description of dev.
  * @return int Description of return value.
  */
-int check_if_any_socket_connected(void);
+int check_if_any_socket_connected(const struct device *dev);
 
 #endif /* HL78XX_H */
