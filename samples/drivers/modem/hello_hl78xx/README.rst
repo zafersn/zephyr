@@ -41,7 +41,7 @@ Sample Output
    [00:00:12.840,000] <inf> hl78xx_dev: switch from run enable gprs script to carrier on
    [00:00:15.944,000] <inf> main: IP Up
    [00:00:15.944,000] <inf> main: Connected to network
-   
+
    **********************************************************
    ********* Hello HL78XX Modem Sample Application **********
    **********************************************************
@@ -53,8 +53,8 @@ Sample Output
    [00:00:15.980,000] <inf> main: Connection status: Not Registered
    [00:00:15.980,000] <inf> main: RSRP : -97
    **********************************************************
-   
-   [00:00:15.980,000] <inf> main: Setting new APN: 
+
+   [00:00:15.980,000] <inf> main: Setting new APN:
    [00:00:15.980,000] <inf> main: IP down
    [00:00:15.980,000] <inf> main: Disconnected from network
    [00:00:16.013,000] <inf> main: New APN: ""

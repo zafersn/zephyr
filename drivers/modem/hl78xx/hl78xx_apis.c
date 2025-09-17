@@ -341,7 +341,7 @@ int hl78xx_api_func_set_apn(const struct device *dev, const char *apn)
 	 * If the value is null or omitted, then the subscription
 	 * value will be requested
 	 */
-	if ((apn == NULL)) {
+	if (apn == NULL) {
 		return -EINVAL;
 	}
 

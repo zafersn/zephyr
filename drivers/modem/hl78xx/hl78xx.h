@@ -357,7 +357,7 @@ uint32_t hash32(const char *str, int len);
 
 /**
  * @brief DNS resolution work callback.
- * 
+ *
  * @param dev Pointer to the device structure.
  * Should be used internally to handle DNS resolution events.
  */
@@ -388,15 +388,6 @@ void iface_status_work_cb(struct hl78xx_data *data,
  * @return Converted integer on success, or err_value on failure.
  */
 int modem_atoi(const char *s, const int err_value, const char *desc, const char *func);
-
-/**
- * @brief Initialize sockets for the modem.
- *
- * Sets up the socket table and configuration for socket communication.
- *
- * @param data Pointer to the modem HL78xx driver data structure.
- */
-// void hl78xx_socket_init(struct hl78xx_data *data);
 
 /**
  * @brief Notify the system of socket data changes.
@@ -435,10 +426,10 @@ void tcp_notify_data(int socket_id, int tcp_notif, void *user_data);
  *
  * @return 0 on success, negative errno code on failure.
  */
-int modem_dynamic_cmd_send(struct hl78xx_data *data, modem_chat_script_callback script_user_callback,
-		       const uint8_t *cmd, uint16_t cmd_len,
-		       const struct modem_chat_match *response_matches, uint16_t matches_size,
-		       bool user_cmd);
+int modem_dynamic_cmd_send(struct hl78xx_data *data,
+			   modem_chat_script_callback script_user_callback, const uint8_t *cmd,
+			   uint16_t cmd_len, const struct modem_chat_match *response_matches,
+			   uint16_t matches_size, bool user_cmd);
 
 /**
  * @brief Find a memory block inside another block (C99-compatible version).
@@ -610,8 +601,9 @@ int hl78xx_api_func_set_apn(const struct device *dev, const char *apn);
  * @param size Description of size.
  * @return int Description of return value.
  */
-int hl78xx_api_func_get_modem_info_standard(const struct device *dev, enum cellular_modem_info_type type,
-				   char *info, size_t size);
+int hl78xx_api_func_get_modem_info_standard(const struct device *dev,
+					    enum cellular_modem_info_type type, char *info,
+					    size_t size);
 
 /**
  * @brief hl78xx_enter_state - Brief description of the function.

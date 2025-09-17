@@ -12,7 +12,9 @@ compatible: "swir,hl78xx-offload"
 properties:
   max-data-length:
     type: int
-    description: "Maximum length of a single data payload (bytes) that the modem can send/receive in one offload operation."
+    description: |
+      "Maximum length of a single data payload (bytes) that 
+      the modem can send/receive in one offload operation."
     enum:
       - 512
       - 1024
@@ -22,4 +24,9 @@ properties:
 
   offload-priority:
     type: int
-    description: "Optional priority value used when registering socket offload with the network stack."
+    description: |
+      "Priority of this offload modem compared to other offload
+      modems in the system. Lower values indicate higher priority.
+      The system will prefer to use the offload modem with the
+      highest priority (lowest value) when multiple offload modems
+      are available."

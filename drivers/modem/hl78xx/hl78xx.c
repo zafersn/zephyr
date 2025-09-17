@@ -335,7 +335,8 @@ static void hl78xx_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc, 
 	LOG_DBG("cgmm: %s %s", argv[0], argv[1]);
 #endif
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.model_id, argv[1], sizeof(data->identity.model_id));
+	safe_strncpy_local((char *)data->identity.model_id, argv[1],
+			   sizeof(data->identity.model_id));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -374,7 +375,8 @@ static void hl78xx_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc, 
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.manufacturer, argv[1], sizeof(data->identity.manufacturer));
+	safe_strncpy_local((char *)data->identity.manufacturer, argv[1],
+			   sizeof(data->identity.manufacturer));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -391,7 +393,8 @@ static void hl78xx_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc, 
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.fw_version, argv[1], sizeof(data->identity.fw_version));
+	safe_strncpy_local((char *)data->identity.fw_version, argv[1],
+			   sizeof(data->identity.fw_version));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -765,16 +768,15 @@ int modem_dynamic_cmd_send(
 		return -1;
 	}
 
-	struct modem_chat_script_chat dynamic_script = 
-	{
+	struct modem_chat_script_chat dynamic_script = {
 		.request = cmd,
 		.request_size = cmd_size,
 		.response_matches = response_matches,
 		.response_matches_size = matches_size,
 		.timeout = 1000,
 	};
-	struct modem_chat_script chat_script = 
-	{
+
+	struct modem_chat_script chat_script = {
 		.name = "dynamic_script",
 		.script_chats = &dynamic_script,
 		.script_chats_size = 1,
@@ -785,6 +787,7 @@ int modem_dynamic_cmd_send(
 	};
 
 	int script_ret = modem_chat_run_script(&data->chat, &chat_script);
+
 	if (script_ret < 0) {
 		LOG_ERR("%d %s Failed to run at command: %d", __LINE__, __func__, script_ret);
 	} else {
@@ -1108,7 +1111,7 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 		char cmd_kselq[] = "AT+KSELACQ=0," CONFIG_MODEM_HL78XX_AUTORAT_PRL_PROFILES;
 		/* Re-congfiguring PRL context definition */
 		ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq, strlen(cmd_kselq), &ok_match, 1,
-					 false);
+					     false);
 		if (ret < 0) {
 			goto error;
 		} else {
@@ -1124,8 +1127,8 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 		char const *cmd_kselq_disable = (const char *)DISABLE_RAT_AUTO;
 
 		/* Re-congfiguring PRL context definition */
-		ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq_disable, strlen(cmd_kselq_disable),
-					 &ok_match, 1, false);
+		ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq_disable,
+					     strlen(cmd_kselq_disable), &ok_match, 1, false);
 		if (ret < 0) {
 			goto error;
 		}
@@ -1134,8 +1137,8 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 	char const *cmd_ksrat_query = (const char *)KSRAT_QUERY;
 
 	/* Re-congfiguring PRL context definition */
-	ret = modem_dynamic_cmd_send(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query), &ksrat_match,
-				 1, false);
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query),
+				     &ksrat_match, 1, false);
 	if (ret < 0) {
 		goto error;
 	}
@@ -1179,8 +1182,8 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 	}
 
 	if (*rat_request != data->status.registration.rat_mode) {
-		ret = modem_dynamic_cmd_send(data, NULL, cmd_set_rat, strlen(cmd_set_rat), &ok_match, 1,
-					 false);
+		ret = modem_dynamic_cmd_send(data, NULL, cmd_set_rat, strlen(cmd_set_rat),
+					     &ok_match, 1, false);
 		if (ret < 0) {
 			goto error;
 		} else {
@@ -1227,8 +1230,8 @@ static int hl78xx_band_cfg(struct hl78xx_data *data, bool *modem_require_restart
 
 			snprintf(cmd_bnd, sizeof(cmd_bnd), "AT+KBNDCFG=%d,%s", rat,
 				 bnd_bitmap); /*  RAT=0 for CAT-M1 */
-			ret = modem_dynamic_cmd_send(data, NULL, cmd_bnd, strlen(cmd_bnd), &ok_match, 1,
-						 false);
+			ret = modem_dynamic_cmd_send(data, NULL, cmd_bnd, strlen(cmd_bnd),
+						     &ok_match, 1, false);
 			if (ret < 0) {
 				goto error;
 			} else {
@@ -1266,8 +1269,8 @@ static int hl78xx_on_rat_cfg_script_state_enter(struct hl78xx_data *data)
 	if (modem_require_restart) {
 		const char *cmd_restart = (const char *)SET_AIRPLANE_MODE_CMD;
 
-		ret = modem_dynamic_cmd_send(data, NULL, cmd_restart, strlen(cmd_restart), &ok_match, 1,
-					 false);
+		ret = modem_dynamic_cmd_send(data, NULL, cmd_restart, strlen(cmd_restart),
+					     &ok_match, 1, false);
 		if (ret < 0) {
 			goto error;
 		}
@@ -1297,7 +1300,7 @@ static void hl78xx_run_rat_cfg_script_event_handler(struct hl78xx_data *data, en
 
 		/* Re-check if rat config is correct */
 		ret = modem_dynamic_cmd_send(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query),
-					 &ksrat_match, 1, false);
+					     &ksrat_match, 1, false);
 		if (ret < 0) {
 			hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SUSPEND);
 		}
@@ -1531,7 +1534,7 @@ static int hl78xx_on_carrier_off_state_leave(struct hl78xx_data *data)
 
 MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_pwroff_cmds,
 			      MODEM_CHAT_SCRIPT_CMD_RESP(SET_SIM_PWR_OFF_MODE_CMD, ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP(MDM_POWER_OFF_CMD_LEGACY, ok_match), );
+			      MODEM_CHAT_SCRIPT_CMD_RESP(MDM_POWER_OFF_CMD_LEGACY, ok_match));
 
 MODEM_CHAT_SCRIPT_DEFINE(hl78xx_pwroff_script, hl78xx_pwroff_cmds, abort_matches,
 			 hl78xx_chat_callback_handler, 4);
@@ -1972,6 +1975,7 @@ static int hl78xx_init(const struct device *dev)
 	for (int i = 0; i < ARRAY_SIZE(gpio_pins); i++) {
 		if (gpio_pins[i] == NULL || !gpio_is_ready_dt(gpio_pins[i])) {
 			const char *port_name = "unknown";
+
 			if (gpio_pins[i] != NULL && gpio_pins[i]->port != NULL) {
 				port_name = gpio_pins[i]->port->name;
 			}
@@ -2053,8 +2057,6 @@ static int hl78xx_init(const struct device *dev)
 	if (ret < 0) {
 		goto error;
 	}
-
-	// hl78xx_socket_init(data);
 
 #ifndef CONFIG_PM_DEVICE
 	hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_RESUME);

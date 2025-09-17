@@ -41,6 +41,7 @@ static bool is_direct(const struct hl78xx_evt_monitor_entry *mon)
 int hl78xx_evt_monitor_register(struct hl78xx_evt_monitor_entry *mon)
 {
 	k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+
 	mon->next = monitor_list_head;
 	monitor_list_head = mon;
 	k_spin_unlock(&monitor_list_lock, key);
@@ -91,6 +92,7 @@ void hl78xx_evt_monitor_dispatch(struct hl78xx_evt *notif)
 	}
 
 	k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+
 	for (struct hl78xx_evt_monitor_entry *e = monitor_list_head; e; e = e->next) {
 		if (!is_paused(e)) {
 			if (is_direct(e)) {
@@ -137,6 +139,7 @@ static void hl78xx_evt_monitor_task(struct k_work *work)
 		}
 		/* Instance/context monitors */
 		k_spinlock_key_t key = k_spin_lock(&monitor_list_lock);
+
 		for (struct hl78xx_evt_monitor_entry *e = monitor_list_head; e; e = e->next) {
 			if (!is_paused(e) && !is_direct(e)) {
 				e->handler(&evt_notif->data, e);
