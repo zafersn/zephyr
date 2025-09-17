@@ -290,6 +290,11 @@ struct hl78xx_data {
 #endif
 
 	const struct device *dev;
+	/* GNSS device */
+	const struct device *gnss_dev;
+	/* Offload device */
+	const struct device *offload_dev;
+
 	struct kselacq_syntax kselacq_data;
 };
 
@@ -389,7 +394,7 @@ int modem_atoi(const char *s, const int err_value, const char *desc, const char 
  *
  * @param data Pointer to the modem HL78xx driver data structure.
  */
-void hl78xx_socket_init(struct hl78xx_data *data);
+// void hl78xx_socket_init(struct hl78xx_data *data);
 
 /**
  * @brief Notify the system of socket data changes.

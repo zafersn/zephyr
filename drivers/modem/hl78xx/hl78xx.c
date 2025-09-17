@@ -718,7 +718,6 @@ int modem_cmd_send_int(struct hl78xx_data *data, modem_chat_script_callback scri
 		       bool user_cmd)
 {
 	int ret = 0;
-
 	ret = k_mutex_lock(&data->tx_lock, K_NO_WAIT);
 	if (ret < 0) {
 		if (user_cmd == false) {
@@ -755,6 +754,7 @@ int modem_cmd_send_int(struct hl78xx_data *data, modem_chat_script_callback scri
 		}
 		return -1;
 	}
+	
 	return ret;
 }
 
@@ -2002,7 +2002,7 @@ static int hl78xx_init(const struct device *dev)
 		goto error;
 	}
 
-	hl78xx_socket_init(data);
+	// hl78xx_socket_init(data);
 
 #ifndef CONFIG_PM_DEVICE
 	hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_RESUME);
