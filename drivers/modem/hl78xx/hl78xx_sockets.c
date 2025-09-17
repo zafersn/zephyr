@@ -2051,6 +2051,7 @@ static int hl78xx_init_sockets(const struct device *dev)
 {
 	int ret;
 	struct hl78xx_socket_data *socket_data_lcl = (struct hl78xx_socket_data *)dev->data;
+
 	socket_data_lcl->buf_pool = &mdm_recv_pool;
 
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG

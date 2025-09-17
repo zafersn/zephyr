@@ -13,7 +13,7 @@ properties:
   max-data-length:
     type: int
     description: |
-      "Maximum length of a single data payload (bytes) that 
+      "Maximum length of a single data payload (bytes) that
       the modem can send/receive in one offload operation."
     enum:
       - 512
