@@ -207,8 +207,8 @@ struct apn_state {
 struct registration_status {
 	bool is_registered_currently;
 	bool is_registered_previously;
-	enum hl78xx_registration_status network_state_current;
-	enum hl78xx_registration_status network_state_previous;
+	enum cellular_registration_status network_state_current;
+	enum cellular_registration_status network_state_previous;
 	enum hl78xx_cell_rat_mode rat_mode;
 };
 /* driver data */
@@ -273,6 +273,7 @@ struct hl78xx_data {
 	struct modem_chat chat;
 
 	struct k_mutex tx_lock;
+	struct k_mutex api_lock;
 	struct k_sem script_stopped_sem_tx_int;
 	struct k_sem script_stopped_sem_rx_int;
 	struct k_sem suspended_sem;
@@ -434,7 +435,7 @@ void tcp_notify_data(int socket_id, int tcp_notif, void *user_data);
  *
  * @return 0 on success, negative errno code on failure.
  */
-int modem_cmd_send_int(struct hl78xx_data *data, modem_chat_script_callback script_user_callback,
+int modem_dynamic_cmd_send(struct hl78xx_data *data, modem_chat_script_callback script_user_callback,
 		       const uint8_t *cmd, uint16_t cmd_len,
 		       const struct modem_chat_match *response_matches, uint16_t matches_size,
 		       bool user_cmd);
@@ -583,36 +584,6 @@ void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn
 int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size);
 
 /**
- * @brief hl78xx_api_func_set_phone_functionality - Brief description of the function.
- * @param dev Description of dev.
- * @param functionality Description of functionality.
- * @param reset Description of reset.
- * @return int Description of return value.
- */
-int hl78xx_api_func_set_phone_functionality(const struct device *dev,
-					    enum hl78xx_phone_functionality functionality,
-					    bool reset);
-
-/**
- * @brief hl78xx_api_func_get_phone_functionality - Brief description of the function.
- * @param dev Description of dev.
- * @param functionality Description of functionality.
- * @return int Description of return value.
- */
-int hl78xx_api_func_get_phone_functionality(const struct device *dev,
-					    enum hl78xx_phone_functionality *functionality);
-
-/**
- * @brief hl78xx_api_func_get_signal - Brief description of the function.
- * @param dev Description of dev.
- * @param type Description of type.
- * @param value Description of value.
- * @return int Description of return value.
- */
-int hl78xx_api_func_get_signal(const struct device *dev, const enum hl78xx_signal_type type,
-			       int16_t *value);
-
-/**
  * @brief hl78xx_api_func_get_registration_status - Brief description of the function.
  * @param dev Description of dev.
  * @param tech Description of tech.
@@ -620,41 +591,27 @@ int hl78xx_api_func_get_signal(const struct device *dev, const enum hl78xx_signa
  * @return int Description of return value.
  */
 int hl78xx_api_func_get_registration_status(const struct device *dev,
-					    enum hl78xx_cell_rat_mode *tech,
-					    enum hl78xx_registration_status *status);
+					    enum cellular_access_technology tech,
+					    enum cellular_registration_status *status);
 
 /**
- * @brief hl78xx_api_func_get_modem_info - Brief description of the function.
+ * @brief hl78xx_api_func_set_apn - Brief description of the function.
+ * @param dev Description of dev.
+ * @param apn Description of apn.
+ * @return int Description of return value.
+ */
+int hl78xx_api_func_set_apn(const struct device *dev, const char *apn);
+
+/**
+ * @brief hl78xx_api_func_get_modem_info_standard - Brief description of the function.
  * @param dev Description of dev.
  * @param type Description of type.
  * @param info Description of info.
  * @param size Description of size.
  * @return int Description of return value.
  */
-int hl78xx_api_func_get_modem_info(const struct device *dev, enum hl78xx_modem_info_type type,
+int hl78xx_api_func_get_modem_info_standard(const struct device *dev, enum cellular_modem_info_type type,
 				   char *info, size_t size);
-
-/**
- * @brief hl78xx_api_func_set_apn - Brief description of the function.
- * @param dev Description of dev.
- * @param apn Description of apn.
- * @param size Description of size.
- * @return int Description of return value.
- */
-int hl78xx_api_func_set_apn(const struct device *dev, const char *apn, uint16_t size);
-
-/**
- * @brief hl78xx_api_func_modem_cmd_send_int - Brief description of the function.
- * @param dev Description of dev.
- * @param cmd Description of cmd.
- * @param cmd_size Description of cmd_size.
- * @param response_matches Description of response_matches.
- * @param matches_size Description of matches_size.
- * @return int Description of return value.
- */
-int hl78xx_api_func_modem_cmd_send_int(const struct device *dev, const char *cmd, uint16_t cmd_size,
-				       const struct modem_chat_match *response_matches,
-				       uint16_t matches_size);
 
 /**
  * @brief hl78xx_enter_state - Brief description of the function.

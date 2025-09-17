@@ -32,17 +32,35 @@ Sample Output
 
 .. code-block:: console
 
+   [00:00:12.840,000] <inf> hl78xx_socket: Apn="netfeasavodiot.mnc028.mcc901.gprs"
+   [00:00:12.840,000] <inf> hl78xx_socket: Addr=10.149.105.74.255.255.255.252
+   [00:00:12.840,000] <inf> hl78xx_socket: Gw=10.149.105.73
+   [00:00:12.840,000] <inf> hl78xx_socket: DNS=141.1.1.1
+   [00:00:12.840,000] <inf> hl78xx_socket: Extracted IP: 10.149.105.74
+   [00:00:12.840,000] <inf> hl78xx_socket: Extracted Subnet: 255.255.255.252
+   [00:00:12.840,000] <inf> hl78xx_dev: switch from run enable gprs script to carrier on
+   [00:00:15.944,000] <inf> main: IP Up
+   [00:00:15.944,000] <inf> main: Connected to network
+   
    **********************************************************
    ********* Hello HL78XX Modem Sample Application **********
    **********************************************************
-   [00:00:16.881,000] <inf> main: Manufacturer: Sierra Wireless
-   [00:00:16.881,000] <inf> main: Firmware Version: HL7812.5.5.17.0
-   [00:00:16.881,000] <inf> main: APN: netfeasavod
-   [00:00:16.881,000] <inf> main: Imei: 352244440111111
-   [00:00:16.881,000] <inf> main: RAT: NB1
-   [00:00:16.881,000] <inf> main: Connection status: Roaming Network
-   [00:00:16.881,000] <inf> main: RSRP : -90
+   [00:00:15.980,000] <inf> main: Manufacturer: Sierra Wireless
+   [00:00:15.980,000] <inf> main: Firmware Version: HL7812.5.7.3.0
+   [00:00:15.980,000] <inf> main: APN: netfeasavodiot
+   [00:00:15.980,000] <inf> main: Imei: 351144441214500
+   [00:00:15.980,000] <inf> main: RAT: NB1
+   [00:00:15.980,000] <inf> main: Connection status: Not Registered
+   [00:00:15.980,000] <inf> main: RSRP : -97
    **********************************************************
+   
+   [00:00:15.980,000] <inf> main: Setting new APN: 
+   [00:00:15.980,000] <inf> main: IP down
+   [00:00:15.980,000] <inf> main: Disconnected from network
+   [00:00:16.013,000] <inf> main: New APN: ""
+   [00:00:16.013,000] <inf> main: Test endpoint: flake.legato.io:6000
+   [00:00:17.114,000] <inf> main: Resolved: 20.29.223.5:6000
+   [00:00:17.114,000] <inf> main: Sample application finished.
 
 After startup, code performs:
 

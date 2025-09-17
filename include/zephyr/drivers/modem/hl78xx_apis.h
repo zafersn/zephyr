@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <zephyr/modem/chat.h>
+#include <zephyr/drivers/cellular.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +68,22 @@ enum hl78xx_phone_functionality {
 	HL78XX_FULLY_FUNCTIONAL,
 	HL78XX_AIRPLANE = 4,
 };
+/** Module status codes */
+enum hl78xx_module_status {
+	HL78XX_MODULE_READY = 0,
+	HL78XX_MODULE_WAITING_FOR_ACCESS_CODE,
+	HL78XX_MODULE_SIM_NOT_PRESENT,
+	HL78XX_MODULE_SIMLOCK,
+	HL78XX_MODULE_UNRECOVERABLE_ERROR,
+	HL78XX_MODULE_UNKNOWN_STATE,
+	HL78XX_MODULE_INACTIVE_SIM
+};
+
+/** Cellular modem info type */
+enum hl78xx_modem_info_type {
+	/* <APN> Access Point Name */
+	HL78XX_MODEM_INFO_APN,
+};
 
 /** Cellular network structure */
 struct hl78xx_network {
@@ -81,40 +98,6 @@ struct hl78xx_network {
 	uint16_t size;
 };
 
-/** Cellular signal type */
-enum hl78xx_signal_type {
-	HL78XX_SIGNAL_RSSI,
-	HL78XX_SIGNAL_RSRP,
-	HL78XX_SIGNAL_RSRQ,
-};
-
-/** Cellular modem info type */
-enum hl78xx_modem_info_type {
-	/** International Mobile Equipment Identity */
-	HL78XX_MODEM_INFO_IMEI,
-	/** Modem model ID */
-	HL78XX_MODEM_INFO_MODEL_ID,
-	/** Modem manufacturer */
-	HL78XX_MODEM_INFO_MANUFACTURER,
-	/** Modem fw version */
-	HL78XX_MODEM_INFO_FW_VERSION,
-	/** International Mobile Subscriber Identity */
-	HL78XX_MODEM_INFO_SIM_IMSI,
-	/** Integrated Circuit Card Identification Number (SIM) */
-	HL78XX_MODEM_INFO_SIM_ICCID,
-	/* <APN> Access Point Name */
-	HL78XX_MODEM_INFO_APN,
-};
-
-enum hl78xx_registration_status {
-	HL78XX_REGISTRATION_NOT_REGISTERED = 0,
-	HL78XX_REGISTRATION_REGISTERED_HOME,
-	HL78XX_REGISTRATION_SEARCHING,
-	HL78XX_REGISTRATION_DENIED,
-	HL78XX_REGISTRATION_UNKNOWN,
-	HL78XX_REGISTRATION_REGISTERED_ROAMING,
-};
-
 enum hl78xx_evt_type {
 	HL78XX_LTE_RAT_UPDATE,
 	HL78XX_LTE_REGISTRATION_STAT_UPDATE,
@@ -126,7 +109,7 @@ struct hl78xx_evt {
 	enum hl78xx_evt_type type;
 
 	union {
-		enum hl78xx_registration_status reg_status;
+		enum cellular_registration_status reg_status;
 		enum hl78xx_cell_rat_mode rat_mode;
 		bool status;
 		int value;
@@ -142,18 +125,18 @@ typedef int (*hl78xx_api_get_supported_networks)(const struct device *dev,
 						 uint8_t *size);
 
 /** API for getting network signal strength */
-typedef int (*hl78xx_api_get_signal)(const struct device *dev, const enum hl78xx_signal_type type,
+typedef int (*hl78xx_api_get_signal)(const struct device *dev, const enum cellular_signal_type type,
 				     int16_t *value);
 
 /** API for getting modem information */
 typedef int (*hl78xx_api_get_modem_info)(const struct device *dev,
-					 const enum hl78xx_modem_info_type type, char *info,
+					 const enum cellular_modem_info_type type, char *info,
 					 size_t size);
 
 /** API for getting registration status */
 typedef int (*hl78xx_api_get_registration_status)(const struct device *dev,
-						  enum hl78xx_cell_rat_mode *tech,
-						  enum hl78xx_registration_status *status);
+						  enum cellular_access_technology tech,
+						  enum cellular_registration_status *status);
 
 /** API for setting apn */
 typedef int (*hl78xx_api_set_apn)(const struct device *dev, const char *apn, uint16_t size);
@@ -191,99 +174,61 @@ struct hl78xx_evt_monitor_entry {
 	} flags;
 };
 
-/** Cellular driver API */
-__subsystem struct hl78xx_driver_api {
-	hl78xx_api_configure_networks configure_networks;
-	hl78xx_api_get_supported_networks get_supported_networks;
-	hl78xx_api_get_signal get_signal;
-	hl78xx_api_get_modem_info get_modem_info;
-	hl78xx_api_get_registration_status get_registration_status;
-	hl78xx_api_set_apn set_apn;
-	hl78xx_api_set_phone_functionality set_phone_functionality;
-	hl78xx_api_get_phone_functionality get_phone_functionality;
-	hl78xx_api_send_at_cmd send_at_cmd;
-};
+/**
+ * @brief hl78xx_api_func_set_phone_functionality - Brief description of the function.
+ * @param dev Description of dev.
+ * @param functionality Description of functionality.
+ * @param reset Description of reset.
+ * @return int Description of return value.
+ */
+int hl78xx_api_func_set_phone_functionality(const struct device *dev,
+					    enum hl78xx_phone_functionality functionality,
+					    bool reset);
 
 /**
- * @brief Configure cellular networks for the device
- *
- * @details Cellular network devices support at least one cellular access technology.
- * Each cellular access technology defines a set of bands, of which the cellular device
- * will support all or a subset of.
- *
- * The cellular device can only use one cellular network technology at a time. It must
- * exclusively use the cellular network configurations provided, and will prioritize
- * the cellular network configurations in the order they are provided in case there are
- * multiple (the first cellular network configuration has the highest priority).
- *
- * @param dev Cellular network device instance.
- * @param networks List of cellular network configurations to apply.
- * @param size Size of list of cellular network configurations.
- *
- * @retval 0 if successful.
- * @retval -EINVAL if any provided cellular network configuration is invalid or unsupported.
- * @retval -ENOTSUP if API is not supported by cellular network device.
- * @retval Negative errno-code otherwise.
+ * @brief hl78xx_api_func_get_phone_functionality - Brief description of the function.
+ * @param dev Description of dev.
+ * @param functionality Description of functionality.
+ * @return int Description of return value.
  */
-static inline int hl78xx_configure_networks(const struct device *dev,
-					    const struct hl78xx_network *networks, uint8_t size)
-{
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->configure_networks == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->configure_networks(dev, networks, size);
-}
+int hl78xx_api_func_get_phone_functionality(const struct device *dev,
+					    enum hl78xx_phone_functionality *functionality);
 
 /**
- * @brief Get supported cellular networks for the device
- *
- * @param dev Cellular network device instance
- * @param networks Pointer to list of supported cellular network configurations.
- * @param size Size of list of cellular network configurations.
- *
- * @retval 0 if successful.
- * @retval -ENOTSUP if API is not supported by cellular network device.
- * @retval Negative errno-code otherwise.
+ * @brief hl78xx_api_func_get_signal - Brief description of the function.
+ * @param dev Description of dev.
+ * @param type Description of type.
+ * @param value Description of value.
+ * @return int Description of return value.
  */
-static inline int hl78xx_get_supported_networks(const struct device *dev,
-						const struct hl78xx_network **networks,
-						uint8_t *size)
-{
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->get_supported_networks == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->get_supported_networks(dev, networks, size);
-}
+int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_signal_type type,
+			       int16_t *value);
 
 /**
- * @brief Get signal for the device
- *
- * @param dev Cellular network device instance
- * @param type Type of the signal information requested
- * @param value Signal strength destination (one of RSSI, RSRP, RSRQ)
- *
- * @retval 0 if successful.
- * @retval -ENOTSUP if API is not supported by cellular network device.
- * @retval -ENODATA if device is not in a state where signal can be polled
- * @retval Negative errno-code otherwise.
+ * @brief hl78xx_api_func_get_modem_info_vendor - Brief description of the function.
+ * @param dev Description of dev.
+ * @param type Description of type.
+ * @param info Description of info.
+ * @param size Description of size.
+ * @return int Description of return value.
  */
-static inline int hl78xx_get_signal(const struct device *dev, const enum hl78xx_signal_type type,
-				    int16_t *value)
-{
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
+int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
+					  enum hl78xx_modem_info_type type, char *info,
+					  size_t size);
 
-	if (api->get_signal == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->get_signal(dev, type, value);
-}
+/**
+ * @brief hl78xx_api_func_modem_dynamic_cmd_send - Brief description of the function.
+ * @param dev Description of dev.
+ * @param cmd Description of cmd.
+ * @param cmd_size Description of cmd_size.
+ * @param response_matches Description of response_matches.
+ * @param matches_size Description of matches_size.
+ * @return int Description of return value.
+ */
+int hl78xx_api_func_modem_dynamic_cmd_send(const struct device *dev, const char *cmd,
+					   uint16_t cmd_size,
+					   const struct modem_chat_match *response_matches,
+					   uint16_t matches_size);
 
 /**
  * @brief Get modem info for the device
@@ -302,63 +247,9 @@ static inline int hl78xx_get_modem_info(const struct device *dev,
 					const enum hl78xx_modem_info_type type, char *info,
 					size_t size)
 {
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->get_modem_info == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->get_modem_info(dev, type, info, size);
+	return hl78xx_api_func_get_modem_info_vendor(dev, type, info, size);
 }
 
-/**
- * @brief Get network registration status for the device
- *
- * @param dev Cellular network device instance
- * @param tech Which access technology to get status for
- * @param status Registration status for given access technology
- *
- * @retval 0 if successful.
- * @retval -ENOSYS if API is not supported by cellular network device.
- * @retval -ENODATA if modem does not provide info requested
- * @retval Negative errno-code from chat module otherwise.
- */
-static inline int hl78xx_get_registration_status(const struct device *dev,
-						 enum hl78xx_cell_rat_mode *tech,
-						 enum hl78xx_registration_status *status)
-{
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->get_registration_status == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->get_registration_status(dev, tech, status);
-}
-
-/**
- * @brief Set the Access Point Name (APN) for the modem.
- *
- * Stores the specified APN string in the modem driver context to be used
- * during PDP context activation or network registration.
- *
- * @param dev Pointer to the modem device instance.
- * @param apn Null-terminated string representing the APN to be set.
- * @param size Length of the APN string, including the null terminator.
- *
- * @retval 0 on success.
- * @retval -EINVAL if input parameters are invalid.
- */
-static inline int hl78xx_set_apn(const struct device *dev, const char *apn, uint16_t size)
-{
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->set_apn == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->set_apn(dev, apn, size);
-}
 /**
  * @brief Set the modem phone functionality mode.
  *
@@ -378,14 +269,9 @@ static inline int hl78xx_set_phone_functionality(const struct device *dev,
 						 enum hl78xx_phone_functionality functionality,
 						 bool reset)
 {
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->set_phone_functionality == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->set_phone_functionality(dev, functionality, reset);
+	return hl78xx_api_func_set_phone_functionality(dev, functionality, reset);
 }
+
 /**
  * @brief Get the current phone functionality mode of the modem.
  *
@@ -403,14 +289,9 @@ static inline int hl78xx_set_phone_functionality(const struct device *dev,
 static inline int hl78xx_get_phone_functionality(const struct device *dev,
 						 enum hl78xx_phone_functionality *functionality)
 {
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
-
-	if (api->get_phone_functionality == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->get_phone_functionality(dev, functionality);
+	return hl78xx_api_func_get_phone_functionality(dev, functionality);
 }
+
 /**
  * @brief Send an AT command to the modem and wait for a matched response.
  *
@@ -434,13 +315,9 @@ static inline int hl78xx_modem_cmd_send(const struct device *dev, const char *cm
 					const struct modem_chat_match *response_matches,
 					uint16_t matches_size)
 {
-	const struct hl78xx_driver_api *api = (const struct hl78xx_driver_api *)dev->api;
 
-	if (api->send_at_cmd == NULL) {
-		return -ENOSYS;
-	}
-
-	return api->send_at_cmd(dev, cmd, cmd_size, response_matches, matches_size);
+	return hl78xx_api_func_modem_dynamic_cmd_send(dev, cmd, cmd_size, response_matches,
+						      matches_size);
 }
 /**
  * @brief Convert raw RSSI value from the modem to dBm.
