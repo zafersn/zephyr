@@ -208,14 +208,9 @@ int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
 	char tmp[MDM_APN_MAX_LENGTH];
 
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	switch (type) {
-	case HL78XX_MODEM_INFO_APN:
+	if (type == HL78XX_MODEM_INFO_APN) {
 		safe_strncpy(tmp, (const char *)data->identity.apn,
 			     MIN(size, sizeof(data->identity.apn)));
-		break;
-	default:
-		ret = -ENOTSUP;
-		break;
 	}
 	k_mutex_unlock(&data->api_lock);
 

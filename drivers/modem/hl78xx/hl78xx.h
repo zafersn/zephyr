@@ -178,6 +178,17 @@ enum hl78xx_tcp_notif {
 	TCP_NOTIF_SSL_INIT_ERROR = 14,
 	TCP_NOTIF_SSL_CERT_ERROR = 15
 };
+/** Enum representing information transfer capability events */
+enum hl78xx_info_transfer_event {
+	EVENT_START_SCAN = 0,
+	EVENT_FAIL_SCAN,
+	EVENT_ENTER_CAMPED,
+	EVENT_CONNECTION_ESTABLISHMENT,
+	EVENT_START_RESCAN,
+	EVENT_RRC_CONNECTED,
+	EVENT_NO_SUITABLE_CELLS,
+	EVENT_ALL_REGISTRATION_FAILED
+};
 
 struct kselacq_syntax {
 	bool mode;
@@ -473,6 +484,7 @@ static inline uint8_t *modem_get_mac(uint8_t *mac_addr, char *imei)
 	return mac_addr;
 }
 
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 /**
  * @brief Handle modem state update from +KSTATE URC (unsolicited result code).
  *
@@ -483,7 +495,8 @@ static inline uint8_t *modem_get_mac(uint8_t *mac_addr, char *imei)
  * @param data Pointer to the HL78xx modem driver data structure.
  * @param state Integer value representing the new modem state as reported by the URC.
  */
-void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state);
+void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state, int rat_mode);
+#endif
 
 #if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID) || defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
 /**

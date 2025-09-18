@@ -429,12 +429,14 @@ static void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t arg
 	if (argc != 3) {
 		return;
 	}
+
+	rat_mode = ATOI(argv[2], 0, "rat_mode");
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("KSTATEV: %s %s %s", argv[0], argv[1], argv[2]);
+	hl78xx_on_kstatev_parser(data, (enum hl78xx_info_transfer_event)ATOI(argv[1], 0, "status"),
+				 rat_mode);
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
-	rat_mode = ATOI(argv[2], 0, "rat_mode");
 
-	hl78xx_on_kstatev_parser(data, ATOI(argv[1], 0, "status"));
 	if (rat_mode != data->status.registration.rat_mode) {
 		struct hl78xx_evt event = {.type = HL78XX_LTE_RAT_UPDATE,
 					   .content.rat_mode = data->status.registration.rat_mode};

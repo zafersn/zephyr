@@ -209,29 +209,45 @@ static inline struct hl78xx_socket_data *hl78xx_socket_data_from_sock(struct mod
 
 	return result;
 }
-
-void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state)
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+/**
+ * @brief Handle modem state update from +KSTATE URC of RAT Scan Finish.
+ * This command is intended to report events for different important state transitions and system
+ * occurrences.
+ * Actually this eventc'state is really important functionality to understand networks
+ * searching phase of the modem.
+ * Verbose debug logging for KSTATEV events
+ */
+void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state, int rat_mode)
 {
 	struct hl78xx_socket_data *socket_data_lcl =
 		(struct hl78xx_socket_data *)data->offload_dev->data;
 
-#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("KSTATEV: socket %d state %d", socket_data_lcl->current_sock_fd, state);
-#endif
 
 	switch (state) {
-	case 1: /* CLOSED */
-		LOG_DBG("Socket fd: %d closed by modem (KSTATEV: 2 1), resetting socket",
-			socket_data_lcl->current_sock_fd);
-		/* Mark socket as closed to block future I/O */
-		/* Free socket resources */
-		/* Set a global flag to indicate reconnect is needed */
+	case EVENT_START_SCAN:
 		break;
-	case 3:
-		LOG_DBG("Socket %d connected", socket_data_lcl->current_sock_fd);
+	case EVENT_FAIL_SCAN:
+		LOG_DBG("Modem failed to find a suitable network");
 		break;
-	case 5:
-		LOG_DBG("Data ready on socket %d", socket_data_lcl->current_sock_fd);
+	case EVENT_ENTER_CAMPED:
+		LOG_DBG("Modem entered camped state on a suitable or acceptable cell");
+		break;
+	case EVENT_CONNECTION_ESTABLISHMENT:
+		LOG_DBG("Modem successfully established a connection to the network");
+		break;
+	case EVENT_START_RESCAN:
+		LOG_DBG("Modem is starting a rescan for available networks");
+		break;
+	case EVENT_RRC_CONNECTED:
+		LOG_DBG("Modem has established an RRC connection with the network");
+		break;
+	case EVENT_NO_SUITABLE_CELLS:
+		LOG_DBG("Modem did not find any suitable cells during the scan");
+		break;
+	case EVENT_ALL_REGISTRATION_FAILED:
+		LOG_DBG("Modem failed to register to any network");
 		break;
 	default:
 		LOG_DBG("Unhandled KSTATEV for socket %d state %d",
@@ -239,6 +255,7 @@ void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state)
 		break;
 	}
 }
+#endif
 
 static bool parse_ip(bool is_ipv4, const char *ip_str, void *out_addr)
 {
@@ -470,7 +487,7 @@ static void hl78xx_on_kudpind(struct modem_chat *chat, char **argv, uint16_t arg
 exit:
 	socket_data_lcl->udp_conn_status.err_code = udp_conn_stat;
 	socket_data_lcl->udp_conn_status.is_connected = false;
-	if (socket_id != -1) {
+	if (socket_id != -1 && sock) {
 		modem_socket_put(&socket_data_lcl->socket_config, sock->sock_fd);
 	}
 }
@@ -1086,9 +1103,18 @@ static int format_ip_and_setup_tls(struct hl78xx_socket_data *socket_data_lcl,
 	}
 
 	if (sock->ip_proto == IPPROTO_TCP) {
-		memcpy(socket_data_lcl->tls.hostname, ip_str,
-		       MIN(MDM_MAX_HOSTNAME_LEN, ip_str_len));
-		socket_data_lcl->tls.hostname[ip_str_len] = '\0';
+		/* Determine actual length of the formatted IP string (it may be
+		 * shorter than the provided buffer size). Copy at most
+		 * MDM_MAX_HOSTNAME_LEN - 1 bytes and ensure NUL-termination to
+		 * avoid writing past the hostname buffer.
+		 */
+		size_t actual_len = strnlen(ip_str, ip_str_len);
+		size_t copy_len = MIN(actual_len, (size_t)MDM_MAX_HOSTNAME_LEN - 1);
+
+		if (copy_len > 0) {
+			memcpy(socket_data_lcl->tls.hostname, ip_str, copy_len);
+		}
+		socket_data_lcl->tls.hostname[copy_len] = '\0';
 		socket_data_lcl->tls.hostname_set = false;
 	}
 
@@ -1312,24 +1338,28 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 {
 	struct modem_socket *sock = (struct modem_socket *)obj;
 	struct hl78xx_socket_data *socket_data_lcl = hl78xx_socket_data_from_sock(sock);
-
-	/* sanity check: does parent == parent->offload_dev->data ? */
-	if (socket_data_lcl && socket_data_lcl->offload_dev &&
-	    socket_data_lcl->offload_dev->data != socket_data_lcl) {
-		LOG_WRN("parent mismatch: parent != offload_dev->data (%p != %p)", socket_data_lcl,
-			socket_data_lcl->offload_dev->data);
-	}
 	int ret = 0;
-	int af;
 	char cmd_buf[sizeof("AT+KTCPCFG=#\r")];
 	char ip_str[NET_IPV6_ADDR_LEN];
-	uint16_t dst_port = 0U;
 
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("%d", __LINE__);
 #endif
 	if (!addr) {
 		errno = EINVAL;
+		return -1;
+	}
+
+	if (!socket_data_lcl || !socket_data_lcl->offload_dev) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* sanity check: does parent == parent->offload_dev->data ? */
+	if (socket_data_lcl && socket_data_lcl->offload_dev &&
+	    socket_data_lcl->offload_dev->data != socket_data_lcl) {
+		LOG_WRN("parent mismatch: parent != offload_dev->data (%p != %p)", socket_data_lcl,
+			socket_data_lcl->offload_dev->data);
 		return -1;
 	}
 
@@ -1360,16 +1390,6 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	}
 
 	memcpy(&sock->dst, addr, sizeof(*addr));
-	if (addr->sa_family == AF_INET6) {
-		af = MDM_HL78XX_SOCKET_AF_IPV6;
-		dst_port = ntohs(net_sin6(addr)->sin6_port);
-	} else if (addr->sa_family == AF_INET) {
-		af = MDM_HL78XX_SOCKET_AF_IPV4;
-		dst_port = ntohs(net_sin(addr)->sin_port);
-	} else {
-		errno = EAFNOSUPPORT;
-		return -1;
-	}
 
 	/* skip socket connect if UDP */
 	if (sock->ip_proto == IPPROTO_UDP) {
@@ -1814,9 +1834,7 @@ static int handle_tls_sockopts(struct hl78xx_socket_data *socket_data_lcl, int o
 		return -EINVAL;
 	}
 }
-#endif /* CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS */
 
-#if defined(CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS)
 static int offload_setsockopt(void *obj, int level, int optname, const void *optval,
 			      socklen_t optlen)
 {
@@ -1830,15 +1848,12 @@ static int offload_setsockopt(void *obj, int level, int optname, const void *opt
 		return -EINVAL;
 	}
 
-	switch (level) {
-#if defined(CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS)
-	case SOL_TLS:
+	if (level == SOL_SOCKET) {
 		return handle_tls_sockopts(socket_data_lcl, optname, optval, optlen);
-#endif
-	default:
-		LOG_DBG("Unsupported socket option: %d", optname);
-		return -EINVAL;
 	}
+
+	LOG_DBG("Unsupported socket option: %d", optname);
+	return -EINVAL;
 }
 #endif /* CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS */
 
