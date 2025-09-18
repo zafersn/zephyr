@@ -73,6 +73,9 @@ function(zephyr_mcuboot_tasks)
                             "APPLICATION_CONFIG_DIR=\"${APPLICATION_CONFIG_DIR}\" "
                             "and WEST_TOPDIR=\"${WEST_TOPDIR}\")")
       endif()
+
+      # Add key file as CMake dependency so a file change will rerun the build
+      set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${${file}})
     endforeach()
   endif()
 
@@ -116,6 +119,14 @@ function(zephyr_mcuboot_tasks)
 
   if(NOT "${keyfile}" STREQUAL "")
     set(imgtool_args --key "${keyfile}" ${imgtool_args})
+  endif()
+
+  if(CONFIG_MCUBOOT_IMGTOOL_UUID_VID)
+    set(imgtool_args ${imgtool_args} --vid "${CONFIG_MCUBOOT_IMGTOOL_UUID_VID_NAME}")
+  endif()
+
+  if(CONFIG_MCUBOOT_IMGTOOL_UUID_CID)
+    set(imgtool_args ${imgtool_args} --cid "${CONFIG_MCUBOOT_IMGTOOL_UUID_CID_NAME}")
   endif()
 
   if(CONFIG_MCUBOOT_IMGTOOL_OVERWRITE_ONLY)

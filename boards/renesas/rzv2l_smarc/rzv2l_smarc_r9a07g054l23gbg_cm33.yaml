@@ -10,4 +10,6 @@ supported:
   - gpio
   - pwm
   - adc
+  - i2c
+  - mbox
 vendor: renesas

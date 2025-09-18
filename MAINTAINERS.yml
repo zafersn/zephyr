@@ -221,9 +221,6 @@ ARM arch:
   maintainers:
     - wearyzen
   collaborators:
-    - microbuilder
-    - carlocaione
-    - galak
     - MaureenHelm
     - stephanosio
     - bbolen
@@ -241,9 +238,7 @@ ARM arch:
     - arch.arm
 
 ARM64 arch:
-  status: maintained
-  maintainers:
-    - carlocaione
+  status: odd fixes
   collaborators:
     - npitre
     - povergoing
@@ -404,6 +399,7 @@ Binary Descriptors:
   maintainers:
     - yonsch
   files:
+    - doc/services/binary_descriptors/
     - subsys/bindesc/
     - include/zephyr/bindesc.h
     - samples/subsys/bindesc/
@@ -674,7 +670,6 @@ Board/SoC configuration:
   maintainers:
     - tejlmand
   collaborators:
-    - galak
     - nashif
     - nordicjm
     - "57300"
@@ -696,7 +691,6 @@ Bootloaders:
 Bouffalolab Platforms:
   status: maintained
   maintainers:
-    - nandojve
     - VynDragon
   files:
     - boards/bflb/
@@ -803,7 +797,6 @@ CMSIS-DSP integration:
   maintainers:
     - stephanosio
   collaborators:
-    - galak
     - XenuIsWatching
   files:
     - modules/cmsis-dsp/
@@ -830,11 +823,20 @@ CMSIS-NN integration:
   tests:
     - libraries.cmsis_nn
 
+CRC:
+  status: maintained
+  maintainers:
+    - thenguyenyf
+  files:
+    - include/zephyr/sys/crc.h
+    - subsys/crc/
+    - tests/subsys/crc/
+  labels:
+    - "area: CRC"
+
 Cache:
   status: maintained
   maintainers:
-    - carlocaione
-  collaborators:
     - nashif
   files:
     - include/zephyr/drivers/cache.h
@@ -1049,7 +1051,6 @@ Devicetree:
     - mbolivar
   collaborators:
     - decsny
-    - galak
     - rruuaanng
   files-regex:
     - ^dts/bindings/.*zephyr.*
@@ -1269,6 +1270,19 @@ Documentation Infrastructure:
     - drivers.can
     - canbus
 
+"Drivers: CRC":
+  status: maintained
+  maintainers:
+    - thenguyenyf
+  files:
+    - drivers/crc/
+    - dts/bindings/crc/
+    - include/zephyr/drivers/crc.h
+    - samples/drivers/crc/
+    - tests/drivers/crc/
+  labels:
+    - "area: CRC"
+
 "Drivers: Charger":
   status: maintained
   maintainers:
@@ -1316,6 +1330,7 @@ Documentation Infrastructure:
     - dts/bindings/comparator/
     - include/zephyr/drivers/comparator.h
     - include/zephyr/drivers/comparator/
+    - include/zephyr/dt-bindings/comparator/
     - tests/drivers/build_all/comparator/
     - tests/drivers/comparator/
     - doc/hardware/peripherals/comparator.rst
@@ -1393,6 +1408,7 @@ Documentation Infrastructure:
   files:
     - drivers/dac/
     - include/zephyr/drivers/dac.h
+    - include/zephyr/drivers/dac/
     - dts/bindings/dac/
     - include/zephyr/dt-bindings/dac/
     - tests/drivers/dac/
@@ -1583,6 +1599,18 @@ Documentation Infrastructure:
   tests:
     - drivers.fpga
 
+"Drivers: Firmware":
+  status: maintained
+  maintainers:
+    - LaurentiuM1234
+  files:
+    - drivers/firmware/
+    - include/zephyr/drivers/firmware/
+    - dts/bindings/firmware/
+    - doc/hardware/arch/arm-scmi.rst
+  labels:
+    - "area: Firmware"
+
 "Drivers: Flash":
   status: maintained
   maintainers:
@@ -1611,6 +1639,7 @@ Documentation Infrastructure:
   status: maintained
   maintainers:
     - aaronemassey
+    - DBS06
     - teburd
   collaborators:
     - DBS06
@@ -1696,6 +1725,7 @@ Documentation Infrastructure:
     - drivers/haptics/
     - dts/bindings/haptics/
     - include/zephyr/drivers/haptics.h
+    - include/zephyr/drivers/haptics/
     - doc/hardware/peripherals/haptics.rst
     - tests/drivers/build_all/haptics/
     - samples/drivers/haptics/
@@ -1866,6 +1896,7 @@ Documentation Infrastructure:
   status: odd fixes
   files:
     - drivers/memc/
+    - include/zephyr/drivers/memc/
     - samples/drivers/memc/
     - tests/drivers/memc/
     - include/zephyr/dt-bindings/memory-controller/
@@ -1885,6 +1916,7 @@ Documentation Infrastructure:
   files:
     - drivers/mfd/
     - include/zephyr/drivers/mfd/
+    - include/zephyr/dt-bindings/mfd/
     - dts/bindings/mfd/
     - tests/drivers/build_all/mfd/
   labels:
@@ -1907,7 +1939,6 @@ Documentation Infrastructure:
   status: odd fixes
   files:
     - drivers/mipi_dsi/
-    - doc/hardware/peripherals/mipi_dsi.rst
     - include/zephyr/drivers/mipi_dsi.h
     - include/zephyr/drivers/mipi_dsi/
     - tests/drivers/mipi_dsi/
@@ -1939,9 +1970,7 @@ Documentation Infrastructure:
     - drivers.mspi
 
 "Drivers: Mbox":
-  status: maintained
-  maintainers:
-    - carlocaione
+  status: odd fixes
   collaborators:
     - wearyzen
     - ithinuel
@@ -2020,9 +2049,7 @@ Documentation Infrastructure:
     - samples.drivers.peci
 
 "Drivers: PM CPU ops":
-  status: maintained
-  maintainers:
-    - carlocaione
+  status: odd fixes
   collaborators:
     - gdengi
     - nbalabak
@@ -2327,9 +2354,7 @@ Documentation Infrastructure:
     - drivers.stepper
 
 "Drivers: Syscon":
-  status: maintained
-  maintainers:
-    - carlocaione
+  status: odd fixes
   files:
     - include/zephyr/drivers/syscon.h
     - drivers/syscon/
@@ -2393,6 +2418,7 @@ Documentation Infrastructure:
     - drivers/video/
     - include/zephyr/drivers/video.h
     - include/zephyr/drivers/video-controls.h
+    - include/zephyr/dt-bindings/video/
     - doc/hardware/peripherals/video.rst
     - tests/drivers/*/video/
     - dts/bindings/video/
@@ -2656,9 +2682,8 @@ Formatted Output:
 GD32 Platforms:
   status: maintained
   maintainers:
-    - nandojve
-  collaborators:
     - soburi
+  collaborators:
     - cameled
   files:
     - boards/gd/
@@ -2743,7 +2768,6 @@ IPC:
   maintainers:
     - doki-nordic
   collaborators:
-    - carlocaione
     - arnopo
   files:
     - include/zephyr/ipc/
@@ -3130,8 +3154,11 @@ MAINTAINERS file:
     - stephanosio
   files:
     - MAINTAINERS.yml
+    - scripts/get_maintainer.py
+    - scripts/set_assignees.py
+    - scripts/check_maintainers.py
   labels:
-    - "area: Process"
+    - "area: MAINTAINER File"
   description: >-
     Zephyr Maintainers File
 
@@ -3167,7 +3194,6 @@ MIPS arch:
 Memory Management:
   status: maintained
   maintainers:
-    - carlocaione
     - dcpleung
   files:
     - subsys/mem_mgmt/
@@ -3247,7 +3273,7 @@ Modbus:
     - include/zephyr/modbus/
     - tests/subsys/modbus/
     - subsys/modbus/
-    - doc/services/modbus/
+    - doc/connectivity/modbus/
   labels:
     - "area: modbus"
   tests:
@@ -3647,6 +3673,25 @@ Networking:
     - net.dhcpv4_client
     - net.dhcpv4_server
 
+"Networking: DSA":
+  status: maintained
+  maintainers:
+    - yangbolu1991
+    - JiafeiPan
+  files:
+    - subsys/net/l2/ethernet/dsa/
+    - drivers/ethernet/dsa/
+    - dts/bindings/dsa/
+    - doc/connectivity/networking/dsa*
+    - include/zephyr/net/dsa*.h
+    - include/zephyr/dt-bindings/ethernet/dsa*.h
+    - samples/net/dsa/
+  labels:
+    - "area: Networking"
+    - "area: DSA"
+  tests:
+    - sample.net.dsa
+
 "Networking: HTTP":
   status: maintained
   maintainers:
@@ -3893,7 +3938,6 @@ Octavo Systems Platforms:
 Open AMP:
   status: maintained
   maintainers:
-    - carlocaione
     - iuliana-prodan
   collaborators:
     - uLipe
@@ -4029,7 +4073,6 @@ RISCV arch:
     - mgielda
     - katsuster
     - edersondisouza
-    - carlocaione
     - npitre
     - ycsin
     - VynDragon
@@ -4190,6 +4233,7 @@ Renesas RA Platforms:
     - duynguyenxa
     - thaoluonguw
     - thenguyenyf
+    - khoa-nguyen-18
   files:
     - boards/arduino/uno_r4/
     - boards/renesas/*ra*/
@@ -4201,6 +4245,7 @@ Renesas RA Platforms:
     - samples/boards/renesas/
     - tests/boards/renesas/
     - include/zephyr/drivers/misc/renesas_ra_external_interrupt/
+    - include/zephyr/drivers/misc/interconn/renesas_elc/
   labels:
     - "platform: Renesas RA"
   description: >-
@@ -4610,11 +4655,11 @@ TDK Sensors:
 TI K3 Platforms:
   status: maintained
   maintainers:
-    - vaishnavachath
+    - glneo
   collaborators:
     - gramsay0
     - dnltz
-    - glneo
+    - vaishnavachath
   files:
     - boards/ti/*am62*/
     - drivers/*/*davinci*
@@ -4623,6 +4668,7 @@ TI K3 Platforms:
     - dts/arm/ti/am6*
     - dts/arm/ti/j7*
     - dts/bindings/*/ti,k3*
+    - dts/vendor/ti/
     - soc/ti/k3/
   labels:
     - "platform: TI K3"
@@ -4918,7 +4964,6 @@ Utilities:
     - dcpleung
     - peter-mitsis
   files:
-    - lib/crc/
     - lib/utils/
     - tests/unit/timeutil/
     - tests/unit/time_units/
@@ -4930,6 +4975,8 @@ Utilities:
     - tests/unit/list/
     - tests/unit/intmath/
     - tests/unit/pot/
+    - tests/unit/hex/
+    - tests/unit/winstream/
     - tests/lib/onoff/
     - tests/lib/sys_util/
     - tests/lib/sprintf/
@@ -5119,7 +5166,6 @@ West:
   maintainers:
     - stephanosio
   collaborators:
-    - microbuilder
     - povergoing
   files:
     - modules/cmsis/
@@ -5155,7 +5201,8 @@ West:
   collaborators:
     - tomi-font
     - ithinuel
-  files: []
+  files:
+    - modules/cmsis_6/
   labels:
     - "area: CMSIS_6"
 
@@ -5199,15 +5246,17 @@ West:
   collaborators:
     - PetervdPerk-NXP
     - jgoppert
-  files: []
+  files:
+    - modules/hal_afbr/
   labels:
     - "platform: Broadcom"
 
 "West project: hal_ambiq":
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - AlessandroLuo
   collaborators:
     - aaronyegx
-    - AlessandroLuo
     - RichardSWheatley
   files:
     - modules/hal_ambiq/
@@ -5228,7 +5277,6 @@ West:
 "West project: hal_bouffalolab":
   status: maintained
   maintainers:
-    - nandojve
     - VynDragon
   files:
     - modules/hal_bouffalolab/
@@ -5278,8 +5326,6 @@ West:
 "West project: hal_gigadevice":
   status: maintained
   maintainers:
-    - nandojve
-  collaborators:
     - soburi
   files:
     - modules/hal_gigadevice/
@@ -5335,13 +5381,13 @@ West:
     - nika-nordic
     - masz-nordic
   collaborators:
-    - hubertmis
     - nordic-krch
     - kl-cruz
     - magp-nordic
     - jaz1-nordic
     - mif1-nordic
     - adamkondraciuk
+    - lstnl
   files:
     - modules/hal_nordic/
   labels:
@@ -5567,7 +5613,6 @@ West:
 "West project: libmetal":
   status: odd fixes
   collaborators:
-    - carlocaione
     - arnopo
   files:
     - modules/Kconfig.libmetal
@@ -5589,6 +5634,15 @@ West:
     - modules/littlefs/
   labels:
     - "area: Storage"
+
+"West project: lora-basics-modem":
+  status: maintained
+  maintainers:
+    - JordanYates
+  files:
+    - modules/lora-basics-modem/
+  labels:
+    - "area: LoRa"
 
 "West project: loramac-node":
   status: maintained
@@ -5673,6 +5727,7 @@ West:
   maintainers:
     - pdgendt
   files:
+    - doc/services/serialization/nanopb.rst
     - modules/nanopb/
     - samples/modules/nanopb/
     - tests/modules/nanopb/
@@ -5716,7 +5771,6 @@ West:
 "West project: open-amp":
   status: odd fixes
   collaborators:
-    - carlocaione
     - uLipe
     - iuliana-prodan
   files:
@@ -5840,7 +5894,6 @@ West:
     - povergoing
     - sgrrzhf
   collaborators:
-    - carlocaione
     - wearyzen
     - ithinuel
   files:
@@ -6020,6 +6073,21 @@ nRF BSIM:
   tests:
     - boards.nrf52_bsim
 
+nRF IronSide SE Platforms:
+  status: maintained
+  maintainers:
+    - hakonfam
+  collaborators:
+    - "57300"
+    - jonathannilsen
+    - karstenkoenig
+    - SebastianBoe
+  files:
+    - soc/nordic/ironside/
+    - soc/nordic/common/uicr/
+  labels:
+    - "platform: nRF IronSide SE"
+
 nRF Platforms:
   status: maintained
   maintainers:
@@ -6030,6 +6098,7 @@ nRF Platforms:
     - kl-cruz
     - magp-nordic
     - nika-nordic
+    - lstnl
   files:
     - boards/nordic/
     - drivers/*/*nrf*.c

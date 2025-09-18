@@ -189,7 +189,7 @@ static int resolve_broker_addr(struct sockaddr_in *broker)
 	};
 	char port_string[6] = {0};
 
-	sprintf(port_string, "%d", TEST_SERVER_PORT);
+	snprintf(port_string, sizeof(port_string), "%d", TEST_SERVER_PORT);
 	ret = getaddrinfo(TEST_SERVER_ENDPOINT, port_string, &hints, &ai);
 	if (ret == 0) {
 		char addr_str[INET_ADDRSTRLEN];
@@ -255,13 +255,19 @@ int main(void)
 	}
 #endif
 	/* Start pleacing your modem based code here */
-	char manufacturer[20] = {0};
-	char fw_ver[17] = {0};
-	char apn[64] = {0};
-	char imei[17] = {0};
-#ifndef MODEM_HL78XX_AUTORAT
+	char manufacturer[MDM_MANUFACTURER_LENGTH] = {0};
+	char fw_ver[MDM_REVISION_LENGTH] = {0};
+	char apn[MDM_APN_MAX_LENGTH] = {0};
+	char operator[MDM_MODEL_LENGTH] = {0};
+	char imei[MDM_IMEI_LENGTH] = {0};
 	enum hl78xx_cell_rat_mode tech;
-#ifdef CONFIG_MODEM_HL78XX_RAT_M1
+	enum cellular_registration_status status;
+	int16_t rsrp;
+	const char *newapn = "";
+	const char *sample_cmd = "AT";
+
+#ifndef CONFIG_MODEM_HL78XX_AUTORAT
+#if defined(CONFIG_MODEM_HL78XX_RAT_M1)
 	tech = HL78XX_RAT_CAT_M1;
 #elif defined(CONFIG_MODEM_HL78XX_RAT_NB1)
 	tech = HL78XX_RAT_NB1;
@@ -273,23 +279,27 @@ int main(void)
 #error "No rat has been selected."
 #endif
 #endif /* MODEM_HL78XX_AUTORAT */
-	enum cellular_registration_status status;
-	int16_t rsrp;
-	const char *newapn = "";
-	const char *sample_cmd = "AT";
 
 	cellular_get_modem_info(modem, CELLULAR_MODEM_INFO_MANUFACTURER, manufacturer,
 				sizeof(manufacturer));
 
 	cellular_get_modem_info(modem, CELLULAR_MODEM_INFO_FW_VERSION, fw_ver, sizeof(fw_ver));
 
-	hl78xx_get_modem_info(modem, HL78XX_MODEM_INFO_APN, apn, sizeof(apn));
+	hl78xx_get_modem_info(modem, HL78XX_MODEM_INFO_APN, (char *)apn, sizeof(apn));
 
 	cellular_get_modem_info(modem, CELLULAR_MODEM_INFO_IMEI, imei, sizeof(imei));
-
+#ifdef CONFIG_MODEM_HL78XX_AUTORAT
+	/* In auto rat mode, get the current rat from the modem status */
+	hl78xx_get_modem_info(modem, HL78XX_MODEM_INFO_CURRENT_RAT,
+			      (enum cellular_access_technology *)&tech, sizeof(tech));
+#endif /* CONFIG_MODEM_HL78XX_AUTORAT */
+	/* Get the current registration status */
 	cellular_get_registration_status(modem, tech, &status);
-
+	/* Get the current signal strength */
 	cellular_get_signal(modem, CELLULAR_SIGNAL_RSRP, &rsrp);
+	/* Get the current network operator name */
+	hl78xx_get_modem_info(modem, HL78XX_MODEM_INFO_NETWORK_OPERATOR, (char *)operator,
+			      sizeof(operator));
 
 	LOG_RAW("\n**********************************************************\n");
 	LOG_RAW("********* Hello HL78XX Modem Sample Application **********\n");
@@ -301,10 +311,18 @@ int main(void)
 	LOG_INF("RAT: %s", rat_get_in_string(tech));
 	LOG_INF("Connection status: %s", reg_status_get_in_string(status));
 	LOG_INF("RSRP : %d", rsrp);
+	LOG_INF("Operator: %s", (strlen(operator) > 0) ? operator : "\"\"");
 	LOG_RAW("**********************************************************\n\n");
 
 	LOG_INF("Setting new APN: %s", newapn);
-	cellular_set_apn(modem, newapn);
+	ret = cellular_set_apn(modem, newapn);
+	if (ret < 0) {
+		LOG_ERR("Failed to set new APN, error: %d", ret);
+	}
+
+	k_sem_reset(&network_connected_sem);
+	LOG_INF("Waiting for network connection...");
+	k_sem_take(&network_connected_sem, K_FOREVER);
 
 	hl78xx_get_modem_info(modem, HL78XX_MODEM_INFO_APN, apn, sizeof(apn));
 
