@@ -220,10 +220,6 @@ static inline struct hl78xx_socket_data *hl78xx_socket_data_from_sock(struct mod
  */
 void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state, int rat_mode)
 {
-	struct hl78xx_socket_data *socket_data_lcl =
-		(struct hl78xx_socket_data *)data->offload_dev->data;
-
-	LOG_DBG("KSTATEV: socket %d state %d", socket_data_lcl->current_sock_fd, state);
 
 	switch (state) {
 	case EVENT_START_SCAN:
@@ -250,8 +246,7 @@ void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state, int rat_mode)
 		LOG_DBG("Modem failed to register to any network");
 		break;
 	default:
-		LOG_DBG("Unhandled KSTATEV for socket %d state %d",
-			socket_data_lcl->current_sock_fd, state);
+		LOG_DBG("Unhandled KSTATEV for state %d", state);
 		break;
 	}
 }
@@ -1790,10 +1785,11 @@ cleanup:
 }
 
 #ifdef CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS
-static int handle_tls_sockopts(struct hl78xx_socket_data *socket_data_lcl, int optname,
-			       const void *optval, socklen_t optlen)
+static int handle_tls_sockopts(void *obj, int optname, const void *optval, socklen_t optlen)
 {
 	int ret;
+	struct modem_socket *sock = (struct modem_socket *)obj;
+	struct hl78xx_socket_data *socket_data_lcl = hl78xx_socket_data_from_sock(sock);
 
 	switch (optname) {
 	case TLS_SEC_TAG_LIST:
@@ -1838,8 +1834,6 @@ static int handle_tls_sockopts(struct hl78xx_socket_data *socket_data_lcl, int o
 static int offload_setsockopt(void *obj, int level, int optname, const void *optval,
 			      socklen_t optlen)
 {
-	struct modem_socket *sock = (struct modem_socket *)obj;
-	struct hl78xx_socket_data *socket_data_lcl = hl78xx_socket_data_from_sock(sock);
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 	LOG_DBG("%d level: %d optname: %d", __LINE__, level, optname);
 #endif
@@ -1848,8 +1842,8 @@ static int offload_setsockopt(void *obj, int level, int optname, const void *opt
 		return -EINVAL;
 	}
 
-	if (level == SOL_SOCKET) {
-		return handle_tls_sockopts(socket_data_lcl, optname, optval, optlen);
+	if (level == SOL_TLS) {
+		return handle_tls_sockopts(obj, optname, optval, optlen);
 	}
 
 	LOG_DBG("Unsupported socket option: %d", optname);
@@ -1950,8 +1944,11 @@ static int offload_ioctl(void *obj, unsigned int request, va_list args)
 		return 0;
 	case F_SETFL: {
 		int flags = va_arg(args, int);
-
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
 		LOG_DBG("F_SETFL called with flags=0x%x", flags);
+#else
+		ARG_UNUSED(flags);
+#endif
 		/* You can store flags if you want, but it's safe to just ignore them. */
 		return 0;
 	}
