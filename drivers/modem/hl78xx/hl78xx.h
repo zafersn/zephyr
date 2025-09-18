@@ -47,16 +47,6 @@
 
 #define MDM_KBND_BITMAP_MAX_ARRAY_SIZE 64
 
-#define MDM_MANUFACTURER_LENGTH 20
-#define MDM_MODEL_LENGTH        16
-#define MDM_REVISION_LENGTH     64
-#define MDM_IMEI_LENGTH         16
-#define MDM_IMSI_LENGTH         23
-#define MDM_ICCID_LENGTH        22
-#define MDM_APN_MAX_LENGTH      64
-#define MDM_MAX_CERT_LENGTH     4096
-#define MDM_MAX_HOSTNAME_LEN    128
-
 #define ADDRESS_FAMILY_IP         "IP"
 #define ADDRESS_FAMILY_IP4        "IPV4"
 #define ADDRESS_FAMILY_IPV6       "IPV6"
@@ -209,11 +199,16 @@ struct kband_syntax {
 	uint8_t bnd_bitmap[MDM_BAND_HEX_STR_LEN];
 };
 
+enum apn_state_enum_t {
+	APN_STATE_NOT_CONFIGURED = 0,
+	APN_STATE_CONFIGURED,
+	APN_STATE_REFRESH_REQUESTED,
+	APN_STATE_REFRESH_IN_PROGRESS,
+	APN_STATE_REFRESH_COMPLETED,
+};
+
 struct apn_state {
-	bool refresh_requested_previously;
-	bool refresh_requested_currently;
-	bool refresh_status_currently;
-	bool refresh_status_previously;
+	enum apn_state_enum_t state;
 };
 struct registration_status {
 	bool is_registered_currently;
@@ -250,6 +245,11 @@ struct hl78xx_phone_functionality_work {
 	bool in_progress;
 };
 
+struct hl78xx_network_operator {
+	char operator[MDM_MODEL_LENGTH];
+	uint8_t format;
+};
+
 struct modem_status {
 	struct registration_status registration;
 	int16_t rssi;
@@ -261,7 +261,8 @@ struct modem_status {
 	enum hl78xx_state state;
 	struct kband_syntax kbndcfg[HL78XX_RAT_COUNT];
 	struct hl78xx_phone_functionality_work phone_functionality;
-	struct apn_state apn_state;
+	struct apn_state apn;
+	struct hl78xx_network_operator network_operator;
 };
 
 struct modem_gpio_callbacks {
@@ -288,6 +289,9 @@ struct hl78xx_data {
 	struct k_sem script_stopped_sem_tx_int;
 	struct k_sem script_stopped_sem_rx_int;
 	struct k_sem suspended_sem;
+#ifdef CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING
+	struct k_sem stay_in_boot_mode_sem;
+#endif /* CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING */
 
 	struct modem_buffers buffers;
 	struct modem_identity identity;
@@ -370,9 +374,10 @@ uint32_t hash32(const char *str, int len);
  * @brief DNS resolution work callback.
  *
  * @param dev Pointer to the device structure.
+ * @param hard_reset Boolean indicating if a hard reset is required.
  * Should be used internally to handle DNS resolution events.
  */
-void dns_work_cb(const struct device *dev);
+void dns_work_cb(const struct device *dev, bool hard_reset);
 
 /**
  * @brief Callback to update and handle network interface status.
@@ -579,15 +584,6 @@ int hl78xx_hex_string_to_bitmap(const char *hex_str, uint8_t *bitmap_out);
 void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn, size_t max_len);
 
 /**
- * @brief hl78xx_set_apn_internal - Brief description of the function.
- * @param data Description of data.
- * @param apn Description of apn.
- * @param size Description of size.
- * @return int Description of return value.
- */
-int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size);
-
-/**
  * @brief hl78xx_api_func_get_registration_status - Brief description of the function.
  * @param dev Description of dev.
  * @param tech Description of tech.
@@ -650,5 +646,13 @@ void notif_carrier_on(const struct device *dev);
  * @return int Description of return value.
  */
 int check_if_any_socket_connected(const struct device *dev);
+
+/**
+ * @brief safe_strncpy - Safely copy strings with NUL-termination.
+ * @param dst Destination buffer.
+ * @param src Source string.
+ * @param dst_size Size of the destination buffer.
+ */
+void safe_strncpy(char *dst, const char *src, size_t dst_size);
 
 #endif /* HL78XX_H */

@@ -147,7 +147,7 @@ endchoice
 
 if MODEM_HL78XX_BOOT_IN_FULLY_FUNCTIONAL_MODE
 
-config MODEM_STAY_IN_BOOT_MODE_FOR_ROAMING
+config MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING
 	bool "WAIT FOR ROAMING"
 	help
 	  Keep the device in boot mode until have +CREG/+CEREG: 1(normal) or 5(roaming)
@@ -304,7 +304,8 @@ endchoice
 
 menuconfig MODEM_HL78XX_CONFIGURE_BANDS
 	bool "Configure modem bands"
-	default "y" if !MODEM_HL78XX_AUTORAT
+	depends on !MODEM_HL78XX_AUTORAT
+	default y if !MODEM_HL78XX_AUTORAT
 	help
 	  Choose this setting to configure which LTE bands the
 	  HL78XX modem should use at boot time.

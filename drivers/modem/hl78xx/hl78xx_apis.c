@@ -15,22 +15,6 @@
 
 LOG_MODULE_REGISTER(hl78xx_apis, CONFIG_MODEM_LOG_LEVEL);
 
-/* Small utility: safe strncpy that always NUL-terminates the destination. */
-static void safe_strncpy(char *dst, const char *src, size_t dst_size)
-{
-	if (dst == NULL || dst_size == 0) {
-		return;
-	}
-
-	if (src == NULL) {
-		dst[0] = '\0';
-		return;
-	}
-
-	strncpy(dst, src, dst_size - 1);
-	dst[dst_size - 1] = '\0';
-}
-
 /* Wrapper to centralize modem_dynamic_cmd_send calls and reduce repetition.
  * returns negative errno on failure or the value returned by modem_dynamic_cmd_send.
  */
@@ -194,7 +178,7 @@ int hl78xx_api_func_get_registration_status(const struct device *dev,
 	return 0;
 }
 int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
-					  enum hl78xx_modem_info_type type, char *info, size_t size)
+					  enum hl78xx_modem_info_type type, void *info, size_t size)
 {
 	int ret = 0;
 	struct hl78xx_data *data = (struct hl78xx_data *)dev->data;
@@ -205,20 +189,38 @@ int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
 	/* copy identity under api lock to a local buffer then write to caller
 	 * prevents holding lock during the return/caller access
 	 */
-	char tmp[MDM_APN_MAX_LENGTH];
-
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	if (type == HL78XX_MODEM_INFO_APN) {
-		safe_strncpy(tmp, (const char *)data->identity.apn,
-			     MIN(size, sizeof(data->identity.apn)));
+	switch (type) {
+	case HL78XX_MODEM_INFO_APN:
+		if (data->status.apn.state != APN_STATE_CONFIGURED) {
+			ret = -ENODATA;
+			break;
+		}
+		safe_strncpy(info, (const char *)data->identity.apn, size);
+		break;
+
+	case HL78XX_MODEM_INFO_CURRENT_RAT:
+		*(enum hl78xx_cell_rat_mode *)info = data->status.registration.rat_mode;
+		break;
+	case HL78XX_MODEM_INFO_NETWORK_OPERATOR:
+		/* Network operator not currently tracked; return empty or implement tracking */
+		const char *network_operator = "AT+COPS?";
+
+		ret = hl78xx_send_cmd(data, network_operator, hl78xx_chat_callback_handler,
+				      allow_match, 2);
+		if (ret < 0) {
+			LOG_ERR("Failed to get network operator");
+		}
+
+		safe_strncpy(info, (const char *)data->status.network_operator.operator,
+			     MIN(size, sizeof(data->status.network_operator.operator)));
+		break;
+
+	default:
+		break;
 	}
 	k_mutex_unlock(&data->api_lock);
 
-	if (ret == 0) {
-		k_mutex_lock(&data->api_lock, K_FOREVER);
-		safe_strncpy(info, tmp, size);
-		k_mutex_unlock(&data->api_lock);
-	}
 	return ret;
 }
 
@@ -279,53 +281,6 @@ int hl78xx_api_func_get_modem_info_standard(const struct device *dev,
 	return ret;
 }
 
-int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size)
-{
-	int ret = 0;
-	char cmd_string[sizeof("AT+KCNXCFG=,\"\",\"\"") + sizeof(uint8_t) +
-			sizeof(MODEM_HL78XX_ADDRESS_FAMILY) + MDM_APN_MAX_LENGTH] = {0};
-	int cmd_max_len = sizeof(cmd_string) - 1;
-	int apn_size = strlen(apn);
-
-	if (apn == NULL || size >= MDM_APN_MAX_LENGTH) {
-		return -EINVAL;
-	}
-
-	/* Update in-memory APN under api lock, but do not hold lock while sending */
-	k_mutex_lock(&data->api_lock, K_FOREVER);
-	if (strncmp(data->identity.apn, apn, apn_size) != 0) {
-		/* copy and ensure NUL termination */
-		safe_strncpy(data->identity.apn, apn, sizeof(data->identity.apn));
-	}
-	k_mutex_unlock(&data->api_lock);
-	/* check if the pdp is active, if yes, disable it first.*/
-	/* Important: Deactivating all PDP contexts (e.g. by using AT+CGACT=0 with no <cid>
-	 *	parameters) also causes the device to detach from the network (equivalent to
-	 *	AT+CGATT=0)
-	 * Theorically it is also equivalent to at+cfun=4
-	 * to keep sync use SET_AIRPLANE_MODE_CMD_LEGACY to deactivate pdp context if you
-	 *have only one pdp context
-	 */
-	snprintk(cmd_string, cmd_max_len, "AT+CGDCONT=1,\"%s\",\"%s\"", MODEM_HL78XX_ADDRESS_FAMILY,
-		 apn);
-
-	ret = hl78xx_send_cmd(data, cmd_string, NULL, &ok_match, 1);
-	if (ret < 0) {
-		goto error;
-	}
-
-	snprintk(cmd_string, cmd_max_len,
-		 "AT+KCNXCFG=1,\"GPRS\",\"%s\",,,\"" MODEM_HL78XX_ADDRESS_FAMILY "\"", apn);
-
-	ret = hl78xx_send_cmd(data, cmd_string, NULL, &ok_match, 1);
-	if (ret < 0) {
-		goto error;
-	}
-
-error:
-	return ret;
-}
-
 int hl78xx_api_func_set_apn(const struct device *dev, const char *apn)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)dev->data;
@@ -347,6 +302,7 @@ int hl78xx_api_func_set_apn(const struct device *dev, const char *apn)
 	/* Update in-memory APN under api lock */
 	k_mutex_lock(&data->api_lock, K_FOREVER);
 	safe_strncpy(data->identity.apn, apn, sizeof(data->identity.apn));
+	data->status.apn.state = APN_STATE_REFRESH_REQUESTED;
 	k_mutex_unlock(&data->api_lock);
 
 	hl78xx_enter_state(data, MODEM_HL78XX_STATE_CARRIER_OFF);

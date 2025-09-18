@@ -286,6 +286,9 @@ static void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc,
 	if (hl78xx_is_registered(data)) {
 		data->status.registration.is_registered_currently = true;
 		hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_REGISTERED);
+#ifdef CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING
+		k_sem_give(&data->stay_in_boot_mode_sem);
+#endif /* CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING */
 	} else {
 		data->status.registration.is_registered_currently = false;
 		hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_DEREGISTERED);
@@ -514,7 +517,6 @@ static void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc,
 	LOG_DBG("KSREP: %s %s", argv[0], argv[1]);
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 }
-#ifndef CONFIG_MODEM_HL78XX_AUTORAT
 static void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
@@ -534,8 +536,6 @@ static void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc,
 	LOG_DBG("KSRAT: %s %s", argv[0], argv[1]);
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 }
-
-#else
 
 static void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
@@ -561,7 +561,6 @@ static void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t arg
 		data->kselacq_data.rat1, data->kselacq_data.rat2, data->kselacq_data.rat3);
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 }
-#endif /* CONFIG_MODEM_HL78XX_AUTORAT */
 
 static void hl78xx_on_kbndcfg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
@@ -636,6 +635,20 @@ static void hl78xx_on_cfun(struct modem_chat *chat, char **argv, uint16_t argc, 
 	data->status.phone_functionality.in_progress = false;
 }
 
+static void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+{
+	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
+
+	if (argc < 3) {
+		return;
+	}
+
+	safe_strncpy((char *)data->status.network_operator.operator, argv[3],
+		     sizeof(data->status.network_operator.operator));
+
+	data->status.network_operator.format = ATOI(argv[2], 0, "network_operator_format");
+}
+
 MODEM_CHAT_MATCH_DEFINE(ok_match, OK_STRING, "", NULL);
 MODEM_CHAT_MATCHES_DEFINE(allow_match, MODEM_CHAT_MATCH(OK_STRING, "", NULL),
 			  MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
@@ -651,7 +664,8 @@ MODEM_CHAT_MATCHES_DEFINE(unsol_matches, MODEM_CHAT_MATCH("+CREG: ", ",", hl78xx
 			  MODEM_CHAT_MATCH("+KBNDCFG: ", ",", hl78xx_on_kbndcfg),
 			  MODEM_CHAT_MATCH("+CSQ: ", ",", hl78xx_on_csq),
 			  MODEM_CHAT_MATCH("+CESQ: ", ",", hl78xx_on_cesq),
-			  MODEM_CHAT_MATCH("+CFUN: ", "", hl78xx_on_cfun));
+			  MODEM_CHAT_MATCH("+CFUN: ", "", hl78xx_on_cfun),
+			  MODEM_CHAT_MATCH("+COPS: ", ",", hl78xx_on_cops));
 
 MODEM_CHAT_MATCHES_DEFINE(abort_matches, MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
 MODEM_CHAT_MATCH_DEFINE(at_ready_match, "+KSUP: ", "", hl78xx_on_ksup);
@@ -662,11 +676,8 @@ MODEM_CHAT_MATCH_DEFINE(cgmi_match, "", "", hl78xx_on_cgmi);
 MODEM_CHAT_MATCH_DEFINE(cgmr_match, "", "", hl78xx_on_cgmr);
 MODEM_CHAT_MATCH_DEFINE(iccid_match, "+CCID: ", "", hl78xx_on_iccid);
 MODEM_CHAT_MATCH_DEFINE(ksrep_match, "+KSREP: ", ",", hl78xx_on_ksrep);
-#ifndef CONFIG_MODEM_HL78XX_AUTORAT
 MODEM_CHAT_MATCH_DEFINE(ksrat_match, "+KSRAT: ", "", hl78xx_on_ksrat);
-#else
 MODEM_CHAT_MATCH_DEFINE(kselacq_match, "+KSELACQ: ", ",", hl78xx_on_kselacq);
-#endif /* CONFIG_MODEM_HL78XX_RAT */
 
 static void hl78xx_init_pipe(const struct device *dev)
 {
@@ -732,9 +743,7 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CIMI", cimi_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGEREP=2", ok_match),
-#ifdef CONFIG_MODEM_HL78XX_AUTORAT
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSELACQ?", kselacq_match),
-#endif /* CONFIG_MODEM_HL78XX_AUTORAT */
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSRAT?", ksrat_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KBNDCFG?", ok_match),
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGACT?", ok_match),
@@ -1276,7 +1285,8 @@ static int hl78xx_on_rat_cfg_script_state_enter(struct hl78xx_data *data)
 		if (ret < 0) {
 			goto error;
 		}
-		hl78xx_start_timer(data, K_MSEC(config->shutdown_time_ms));
+		hl78xx_start_timer(data,
+				   K_MSEC(config->shutdown_time_ms + config->startup_time_ms));
 		return 0;
 	}
 	hl78xx_chat_callback_handler(&data->chat, MODEM_CHAT_SCRIPT_RESULT_SUCCESS, data);
@@ -1287,27 +1297,25 @@ error:
 	return ret;
 }
 
+MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_post_restart_chat_script_cmds,
+			      MODEM_CHAT_SCRIPT_CMD_RESP("", at_ready_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP(KSRAT_QUERY, ksrat_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", ok_match));
+
+MODEM_CHAT_SCRIPT_DEFINE(hl78xx_post_restart_chat_script, hl78xx_post_restart_chat_script_cmds,
+			 abort_matches, hl78xx_chat_callback_handler, 1000);
+
 static void hl78xx_run_rat_cfg_script_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
 	int ret = 0;
-	char const *cmd_ksrat_query = (const char *)KSRAT_QUERY;
 
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_TIMEOUT:
 		LOG_DBG("Rebooting modem to apply new RAT settings");
-		ret = modem_dynamic_cmd_send(data, NULL, NULL, 0, &at_ready_match, 1, false);
+		ret = modem_chat_run_script_async(&data->chat, &hl78xx_post_restart_chat_script);
 		if (ret < 0) {
 			hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SUSPEND);
 		}
-
-		/* Re-check if rat config is correct */
-		ret = modem_dynamic_cmd_send(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query),
-					     &ksrat_match, 1, false);
-		if (ret < 0) {
-			hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SUSPEND);
-		}
-
-		hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SCRIPT_SUCCESS);
 		break;
 
 	case MODEM_HL78XX_EVENT_SCRIPT_SUCCESS:
@@ -1337,22 +1345,84 @@ static void hl78xx_await_power_off_event_handler(struct hl78xx_data *data, enum 
 	}
 }
 
+static int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size)
+{
+	int ret = 0;
+	char cmd_string[sizeof("AT+KCNXCFG=,\"\",\"\"") + sizeof(uint8_t) +
+			MODEM_HL78XX_ADDRESS_FAMILY_FORMAT_LEN + MDM_APN_MAX_LENGTH] = {0};
+	int cmd_max_len = sizeof(cmd_string) - 1;
+	int apn_size = strlen(apn);
+
+	if (apn == NULL || size >= MDM_APN_MAX_LENGTH) {
+		return -EINVAL;
+	}
+
+	/* Update in-memory APN under api lock, but do not hold lock while sending */
+	k_mutex_lock(&data->api_lock, K_FOREVER);
+	if (strncmp(data->identity.apn, apn, apn_size) != 0) {
+		/* copy and ensure NUL termination */
+		safe_strncpy(data->identity.apn, apn, sizeof(data->identity.apn));
+	}
+	k_mutex_unlock(&data->api_lock);
+	/* check if the pdp is active, if yes, disable it first.*/
+	/* Important: Deactivating all PDP contexts (e.g. by using AT+CGACT=0 with no <cid>
+	 *	parameters) also causes the device to detach from the network (equivalent to
+	 *	AT+CGATT=0)
+	 * Theorically it is also equivalent to at+cfun=4
+	 * to keep sync use SET_AIRPLANE_MODE_CMD_LEGACY to deactivate pdp context if you
+	 *have only one pdp context
+	 */
+	snprintk(cmd_string, cmd_max_len, "AT+CGDCONT=1,\"%s\",\"%s\"", MODEM_HL78XX_ADDRESS_FAMILY,
+		 apn);
+
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string), &ok_match, 1,
+				     false);
+	if (ret < 0) {
+		goto error;
+	}
+
+	snprintk(cmd_string, cmd_max_len,
+		 "AT+KCNXCFG=1,\"GPRS\",\"%s\",,,\"" MODEM_HL78XX_ADDRESS_FAMILY "\"", apn);
+
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string), &ok_match, 1,
+				     false);
+	if (ret < 0) {
+		goto error;
+	}
+
+	data->status.apn.state = APN_STATE_CONFIGURED;
+
+	return 0;
+error:
+	LOG_ERR("Set APN to %s, result: %d", apn, ret);
+	return ret;
+}
+
 static int hl78xx_on_enable_gprs_state_enter(struct hl78xx_data *data)
 {
 	int ret = 0;
-
+	/* Apply the APN if not configured yet */
+	if (data->status.apn.state == APN_STATE_REFRESH_REQUESTED) {
+/* APN has been updated by the user, apply the new APN */
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+		LOG_DBG("APN refresh requested, applying new APN: \"%s\"", data->identity.apn);
+#endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
+		data->status.apn.state = APN_STATE_NOT_CONFIGURED;
+	} else {
 #if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_KCONFIG)
-	snprintf(data->identity.apn, sizeof(data->identity.apn), "%s", CONFIG_MODEM_HL78XX_APN);
+		snprintf(data->identity.apn, sizeof(data->identity.apn), "%s",
+			 CONFIG_MODEM_HL78XX_APN);
 #elif defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID) || defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
-	/* autodetect APN from IMSI */
-	/* the list of SIM profiles. Global scope, so the app can change it */
-	/* AT+CCID or AT+CIMI needs to be run here if it is not ran in the init script */
-	if (strlen(data->identity.apn) < 1) {
-		LOG_WRN("%d %s APN is left blank", __LINE__, __func__);
-	}
+		/* autodetect APN from IMSI */
+		/* the list of SIM profiles. Global scope, so the app can change it */
+		/* AT+CCID or AT+CIMI needs to be run here if it is not ran in the init script */
+		if (strlen(data->identity.apn) < 1) {
+			LOG_WRN("%d %s APN is left blank", __LINE__, __func__);
+		}
 #else /* defined(CONFIG_MODEM_HL78XX_APN_SOURCE_NETWORK) */
 /* set blank string to get apn from network */
 #endif
+	}
 	ret = hl78xx_api_func_set_phone_functionality(data->dev, HL78XX_AIRPLANE, false);
 	if (ret) {
 		goto error;
@@ -1462,6 +1532,8 @@ static int hl78xx_on_await_registered_state_leave(struct hl78xx_data *data)
 
 static int hl78xx_on_carrier_on_state_enter(struct hl78xx_data *data)
 {
+	notif_carrier_on(data->dev);
+
 	iface_status_work_cb(data, hl78xx_chat_callback_handler);
 	return 0;
 }
@@ -1475,7 +1547,7 @@ static void hl78xx_carrier_on_event_handler(struct hl78xx_data *data, enum hl78x
 	case MODEM_HL78XX_EVENT_SCRIPT_FAILED:
 		break;
 	case MODEM_HL78XX_EVENT_TIMEOUT:
-		dns_work_cb(data->dev);
+		dns_work_cb(data->dev, true);
 		break;
 	case MODEM_HL78XX_EVENT_DEREGISTERED:
 		hl78xx_enter_state(data, MODEM_HL78XX_STATE_AWAIT_REGISTERED);
@@ -1498,11 +1570,15 @@ static int hl78xx_on_carrier_on_state_leave(struct hl78xx_data *data)
 static int hl78xx_on_carrier_off_state_enter(struct hl78xx_data *data)
 {
 	notif_carrier_off(data->dev);
+
 	/* Check whether or not there is any sockets are connected,
 	 * if true, wait until sockets are closed properly
 	 */
 	if (check_if_any_socket_connected(data->dev) == false) {
 		hl78xx_start_timer(data, K_MSEC(100));
+	} else {
+		/* There are still active sockets, wait until they are closed */
+		hl78xx_start_timer(data, K_MSEC(5000));
 	}
 	return 0;
 }
@@ -1675,6 +1751,10 @@ static int hl78xx_on_idle_state_leave(struct hl78xx_data *data)
 static int hl78xx_on_state_enter(struct hl78xx_data *data)
 {
 	int ret = 0;
+
+#ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+	LOG_DBG("%d %d", __LINE__, data->status.state);
+#endif
 
 	switch (data->status.state) {
 	case MODEM_HL78XX_STATE_IDLE:
@@ -1950,6 +2030,9 @@ static int hl78xx_init(const struct device *dev)
 	ring_buf_init(&data->events.event_rb, sizeof(data->events.event_buf),
 		      data->events.event_buf);
 	k_sem_init(&data->suspended_sem, 0, 1);
+#ifdef CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING
+	k_sem_init(&data->stay_in_boot_mode_sem, 0, 1);
+#endif /* CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING */
 	k_sem_init(&data->script_stopped_sem_tx_int, 0, 1);
 	k_sem_init(&data->script_stopped_sem_rx_int, 0, 1);
 	/* reset to default  */
@@ -2065,7 +2148,9 @@ static int hl78xx_init(const struct device *dev)
 #else
 	pm_device_init_suspended(dev);
 #endif /* CONFIG_PM_DEVICE */
-
+#ifdef CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING
+	k_sem_take(&data->stay_in_boot_mode_sem, K_FOREVER);
+#endif
 	return 0;
 
 error:

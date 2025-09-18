@@ -919,7 +919,7 @@ void iface_status_work_cb(struct hl78xx_data *data, modem_chat_script_callback s
 	}
 }
 
-void dns_work_cb(const struct device *dev)
+void dns_work_cb(const struct device *dev, bool hard_reset)
 {
 #if defined(CONFIG_DNS_RESOLVER) && !defined(CONFIG_DNS_SERVER_IP_ADDRESSES)
 	int ret;
@@ -939,6 +939,15 @@ void dns_work_cb(const struct device *dev)
 #endif
 		NULL};
 	const char *dns_servers_wrapped[ARRAY_SIZE(dns_servers_str)];
+
+	if (hard_reset) {
+		LOG_DBG("Resetting DNS resolver");
+		dnsCtx = dns_resolve_get_default();
+		if (dnsCtx->state != DNS_RESOLVE_CONTEXT_INACTIVE) {
+			dns_resolve_close(dnsCtx);
+		}
+		socket_data->dns.ready = false;
+	}
 
 #ifdef CONFIG_NET_IPV6
 	valid_address = net_ipaddr_parse(socket_data->dns.v6_string,
@@ -960,7 +969,8 @@ void dns_work_cb(const struct device *dev)
 	}
 	if (!socket_data->net_iface || !net_if_is_up(socket_data->net_iface) ||
 	    socket_data->dns.ready) {
-		LOG_DBG("DNS already ready or net_iface problem");
+		LOG_DBG("DNS already ready or net_iface problem %d %d %d", !socket_data->net_iface,
+			!net_if_is_up(socket_data->net_iface), socket_data->dns.ready);
 		return;
 	}
 
@@ -1943,10 +1953,10 @@ static int offload_ioctl(void *obj, unsigned int request, va_list args)
 	case F_GETFL:
 		return 0;
 	case F_SETFL: {
-		int flags = va_arg(args, int);
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
+		int flags = va_arg(args, int);
+
 		LOG_DBG("F_SETFL called with flags=0x%x", flags);
-#else
 		ARG_UNUSED(flags);
 #endif
 		/* You can store flags if you want, but it's safe to just ignore them. */

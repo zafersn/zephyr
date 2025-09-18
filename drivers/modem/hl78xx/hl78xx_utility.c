@@ -193,6 +193,7 @@ void set_band_bit(uint8_t *bitmap, uint16_t band_num)
 	bitmap[byte_index] |= (1 << bit_index);
 }
 
+#ifdef CONFIG_MODEM_HL78XX_CONFIGURE_BANDS
 static uint8_t hl78xx_generate_band_bitmap(uint8_t *bitmap)
 {
 	memset(bitmap, 0, MDM_BAND_BITMAP_LEN_BYTES);
@@ -292,6 +293,8 @@ static uint8_t hl78xx_generate_band_bitmap(uint8_t *bitmap)
 
 	return 0;
 }
+#endif /* CONFIG_MODEM_HL78XX_CONFIGURE_BANDS */
+
 #if defined(CONFIG_MODEM_HL78XX_AUTORAT)
 /**
  * @brief Parse a comma-separated list of bands from a string.
@@ -375,10 +378,11 @@ int hl78xx_generate_bitmap_from_config(enum hl78xx_cell_rat_mode rat, uint8_t *b
 		}
 		return 0;
 	}
-#endif /* CONFIG_MODEM_HL78XX_AUTORAT */
-
+#else
 	/* Else: use standalone config */
 	return hl78xx_generate_band_bitmap(bitmap_out);
+#endif /* CONFIG_MODEM_HL78XX_AUTORAT */
+	return -EINVAL;
 }
 void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, size_t hex_str_len)
 {
@@ -491,4 +495,22 @@ void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn
 		strncpy(essential_apn, apn_buf, max_len - 1);
 		essential_apn[max_len - 1] = '\0';
 	}
+}
+
+/* Small utility: safe strncpy that always NUL-terminates the destination. */
+void safe_strncpy(char *dst, const char *src, size_t dst_size)
+{
+	if (dst == NULL || dst_size == 0) {
+		return;
+	}
+
+	if (src == NULL) {
+		dst[0] = '\0';
+		return;
+	}
+
+	size_t len = MIN(strlen(src), dst_size - 1);
+
+	strncpy(dst, src, len);
+	dst[len] = '\0';
 }

@@ -18,18 +18,26 @@ extern "C" {
 #endif
 
 /* Magic constants */
-#define CSQ_RSSI_UNKNOWN   (99)
-#define CESQ_RSRP_UNKNOWN  (255)
-#define CESQ_RSRQ_UNKNOWN  (255)
+#define CSQ_RSSI_UNKNOWN        (99)
+#define CESQ_RSRP_UNKNOWN       (255)
+#define CESQ_RSRQ_UNKNOWN       (255)
 /* Magic numbers to units conversions */
-#define CSQ_RSSI_TO_DB(v)  (-113 + (2 * (rssi)))
-#define CESQ_RSRP_TO_DB(v) (-140 + (v))
-#define CESQ_RSRQ_TO_DB(v) (-20 + ((v) / 2))
+#define CSQ_RSSI_TO_DB(v)       (-113 + (2 * (rssi)))
+#define CESQ_RSRP_TO_DB(v)      (-140 + (v))
+#define CESQ_RSRQ_TO_DB(v)      (-20 + ((v) / 2))
 /** Monitor is paused. */
-#define PAUSED             1
+#define PAUSED                  1
 /** Monitor is active, default */
-#define ACTIVE             0
-
+#define ACTIVE                  0
+#define MDM_MANUFACTURER_LENGTH 20
+#define MDM_MODEL_LENGTH        16
+#define MDM_REVISION_LENGTH     64
+#define MDM_IMEI_LENGTH         16
+#define MDM_IMSI_LENGTH         23
+#define MDM_ICCID_LENGTH        22
+#define MDM_APN_MAX_LENGTH      64
+#define MDM_MAX_CERT_LENGTH     4096
+#define MDM_MAX_HOSTNAME_LEN    128
 /**
  * @brief Define an Event monitor to receive notifications in the system workqueue thread.
  *
@@ -83,6 +91,10 @@ enum hl78xx_module_status {
 enum hl78xx_modem_info_type {
 	/* <APN> Access Point Name */
 	HL78XX_MODEM_INFO_APN,
+	/* <Current RAT> */
+	HL78XX_MODEM_INFO_CURRENT_RAT,
+	/* <Network Operator> */
+	HL78XX_MODEM_INFO_NETWORK_OPERATOR,
 };
 
 /** Cellular network structure */
@@ -213,7 +225,7 @@ int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_sig
  * @return int Description of return value.
  */
 int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
-					  enum hl78xx_modem_info_type type, char *info,
+					  enum hl78xx_modem_info_type type, void *info,
 					  size_t size);
 
 /**
@@ -244,7 +256,7 @@ int hl78xx_api_func_modem_dynamic_cmd_send(const struct device *dev, const char 
  * @retval Negative errno-code from chat module otherwise.
  */
 static inline int hl78xx_get_modem_info(const struct device *dev,
-					const enum hl78xx_modem_info_type type, char *info,
+					const enum hl78xx_modem_info_type type, void *info,
 					size_t size)
 {
 	return hl78xx_api_func_get_modem_info_vendor(dev, type, info, size);
