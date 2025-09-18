@@ -47,7 +47,7 @@ endchoice
 
 if MODEM_HL7812
 
-config MODEM_FW_R6
+config MODEM_HL7812_FW_R6
 	bool "Modem firmware R6"
 	help
 	  Only for HL7812, enable this setting to use NBNTN rat.
@@ -295,7 +295,7 @@ config MODEM_HL78XX_RAT_GSM
 
 config MODEM_HL78XX_RAT_NBNTN
 	bool "NB-NTN"
-	depends on MODEM_FW_R6
+	depends on MODEM_HL7812_FW_R6
 	help
 	  Enable NBNTN mode during modem init.
 	  3 — NBNTN (for HL7810/HL7812 only), It does not support <reboot> = 1

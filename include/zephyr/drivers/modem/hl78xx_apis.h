@@ -59,7 +59,7 @@ enum hl78xx_cell_rat_mode {
 	HL78XX_RAT_NB1,
 #ifdef CONFIG_MODEM_HL7812
 	HL78XX_RAT_GSM,
-#ifdef CONFIG_MODEM_FW_R6
+#ifdef CONFIG_MODEM_HL7812_FW_R6
 	HL78XX_RAT_NBNTN,
 #endif
 #endif

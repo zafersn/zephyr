@@ -45,7 +45,7 @@ static const char *rat_get_in_string(enum hl78xx_cell_rat_mode rat)
 		return "NB1";
 	case HL78XX_RAT_GSM:
 		return "GSM";
-#ifdef CONFIG_MODEM_FW_R6
+#ifdef CONFIG_MODEM_HL7812_FW_R6
 	case HL78XX_RAT_NBNTN:
 		return "NTN";
 #endif

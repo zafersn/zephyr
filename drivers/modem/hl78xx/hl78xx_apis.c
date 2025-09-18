@@ -141,7 +141,7 @@ static enum cellular_access_technology hl78xx_rat_to_access_tech(enum hl78xx_cel
 #ifdef CONFIG_MODEM_HL7812
 	case HL78XX_RAT_GSM:
 		return CELLULAR_ACCESS_TECHNOLOGY_GSM;
-#ifdef CONFIG_MODEM_FW_R6
+#ifdef CONFIG_MODEM_HL7812_FW_R6
 	case HL78XX_RAT_NBNTN:
 		/** NBNTN might not have a direct mapping; choose closest or define new */
 		return CELLULAR_ACCESS_TECHNOLOGY_NB_IOT;

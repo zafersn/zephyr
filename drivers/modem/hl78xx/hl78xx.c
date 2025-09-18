@@ -1175,13 +1175,13 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 
 		*rat_request = HL78XX_RAT_GSM;
 	}
-#ifdef CONFIG_MODEM_FW_R6
+#ifdef CONFIG_MODEM_HL7812_FW_R6
 	else if (IS_ENABLED(CONFIG_MODEM_HL78XX_RAT_NBNTN)) {
 		cmd_set_rat = (const char *)SET_RAT_NBNTN_CMD_LEGACY;
 
 		*rat_request = HL78XX_RAT_NBNTN;
 	}
-#endif /* CONFIG_MODEM_FW_R6 */
+#endif /* CONFIG_MODEM_HL7812_FW_R6 */
 #endif /* CONFIG_MODEM_HL7812 */
 	else {
 		LOG_ERR("%d %s No rat has been selected.", __LINE__, __func__);
