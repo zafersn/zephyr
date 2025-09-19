@@ -104,8 +104,12 @@
 /* Helper macros */
 #define ATOI(s_, value_, desc_) modem_atoi(s_, value_, desc_, __func__)
 
-/* Enums */
+#define HL78XX_LOG_DBG(str, ...)                                                                   \
+	COND_CODE_1(CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG, \
+		    (LOG_DBG(str, ##__VA_ARGS__)), \
+		    ((void)0))
 
+/* Enums */
 enum hl78xx_state {
 	MODEM_HL78XX_STATE_IDLE = 0,
 	MODEM_HL78XX_STATE_RESET_PULSE,
@@ -448,22 +452,6 @@ int modem_dynamic_cmd_send(struct hl78xx_data *data,
 			   uint16_t matches_size, bool user_cmd);
 
 /**
- * @brief Find a memory block inside another block (C99-compatible version).
- *
- * Searches for the first occurrence of the byte string needle of length needlelen
- * in the memory area haystack of length haystacklen.
- *
- * @param haystack Pointer to the memory block to search within.
- * @param haystacklen Length of the haystack memory block.
- * @param needle Pointer to the memory block to search for.
- * @param needlelen Length of the needle memory block.
- *
- * @return Pointer to the beginning of the found needle, or NULL if not found.
- */
-const void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle,
-		       size_t needlelen);
-
-/**
  * @brief Generate a pseudo-random MAC address based on the modem's IMEI.
  *
  * This function creates a MAC address using a fixed prefix and a hash of the IMEI.
@@ -487,6 +475,34 @@ static inline uint8_t *modem_get_mac(uint8_t *mac_addr, char *imei)
 	UNALIGNED_PUT(hash_value, (uint32_t *)(mac_addr + 2));
 
 	return mac_addr;
+}
+
+/**
+ * @brief Small utility: safe strncpy that always NUL-terminates the destination.
+ * This function copies a string from src to dst, ensuring that the destination
+ * buffer is always NUL-terminated, even if the source string is longer than
+ * the destination buffer.
+ * @param dst Destination buffer.
+ * @param src Source string.
+ * @param dst_size Size of the destination buffer.
+ */
+static inline void safe_strncpy(char *dst, const char *src, size_t dst_size)
+{
+	size_t len = 0;
+
+	if (dst == NULL || dst_size == 0) {
+		return;
+	}
+	if (src == NULL) {
+		dst[0] = '\0';
+		return;
+	}
+	len = strlen(src);
+	if (len >= dst_size) {
+		len = dst_size - 1;
+	}
+	memcpy(dst, src, len);
+	dst[len] = '\0';
 }
 
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
@@ -646,13 +662,5 @@ void notif_carrier_on(const struct device *dev);
  * @return int Description of return value.
  */
 int check_if_any_socket_connected(const struct device *dev);
-
-/**
- * @brief safe_strncpy - Safely copy strings with NUL-termination.
- * @param dst Destination buffer.
- * @param src Source string.
- * @param dst_size Size of the destination buffer.
- */
-void safe_strncpy(char *dst, const char *src, size_t dst_size);
 
 #endif /* HL78XX_H */

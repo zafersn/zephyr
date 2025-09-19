@@ -185,7 +185,6 @@ struct hl78xx_evt_monitor_entry {
 		uint8_t direct: 1; /* Dispatch in ISR. */
 	} flags;
 };
-
 /**
  * @brief hl78xx_api_func_set_phone_functionality - Brief description of the function.
  * @param dev Description of dev.
@@ -196,7 +195,6 @@ struct hl78xx_evt_monitor_entry {
 int hl78xx_api_func_set_phone_functionality(const struct device *dev,
 					    enum hl78xx_phone_functionality functionality,
 					    bool reset);
-
 /**
  * @brief hl78xx_api_func_get_phone_functionality - Brief description of the function.
  * @param dev Description of dev.
@@ -205,7 +203,6 @@ int hl78xx_api_func_set_phone_functionality(const struct device *dev,
  */
 int hl78xx_api_func_get_phone_functionality(const struct device *dev,
 					    enum hl78xx_phone_functionality *functionality);
-
 /**
  * @brief hl78xx_api_func_get_signal - Brief description of the function.
  * @param dev Description of dev.
@@ -215,7 +212,6 @@ int hl78xx_api_func_get_phone_functionality(const struct device *dev,
  */
 int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_signal_type type,
 			       int16_t *value);
-
 /**
  * @brief hl78xx_api_func_get_modem_info_vendor - Brief description of the function.
  * @param dev Description of dev.
@@ -227,7 +223,6 @@ int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_sig
 int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
 					  enum hl78xx_modem_info_type type, void *info,
 					  size_t size);
-
 /**
  * @brief hl78xx_api_func_modem_dynamic_cmd_send - Brief description of the function.
  * @param dev Description of dev.
@@ -241,7 +236,6 @@ int hl78xx_api_func_modem_dynamic_cmd_send(const struct device *dev, const char 
 					   uint16_t cmd_size,
 					   const struct modem_chat_match *response_matches,
 					   uint16_t matches_size);
-
 /**
  * @brief Get modem info for the device
  *
@@ -261,7 +255,6 @@ static inline int hl78xx_get_modem_info(const struct device *dev,
 {
 	return hl78xx_api_func_get_modem_info_vendor(dev, type, info, size);
 }
-
 /**
  * @brief Set the modem phone functionality mode.
  *
@@ -283,7 +276,6 @@ static inline int hl78xx_set_phone_functionality(const struct device *dev,
 {
 	return hl78xx_api_func_set_phone_functionality(dev, functionality, reset);
 }
-
 /**
  * @brief Get the current phone functionality mode of the modem.
  *
@@ -303,7 +295,6 @@ static inline int hl78xx_get_phone_functionality(const struct device *dev,
 {
 	return hl78xx_api_func_get_phone_functionality(dev, functionality);
 }
-
 /**
  * @brief Send an AT command to the modem and wait for a matched response.
  *
@@ -422,7 +413,6 @@ static inline void hl78xx_evt_monitor_pause(struct hl78xx_evt_monitor_entry *mon
 {
 	mon->flags.paused = true;
 }
-
 /**
  * @brief Resume monitor.
  *
@@ -434,7 +424,6 @@ static inline void hl78xx_evt_monitor_resume(struct hl78xx_evt_monitor_entry *mo
 {
 	mon->flags.paused = false;
 }
-
 /**
  * @brief Set the event notification handler for HL78xx modem events.
  *
@@ -457,6 +446,11 @@ int hl78xx_evt_monitor_register(struct hl78xx_evt_monitor_entry *mon);
  * @brief Unregister an event monitor from receiving HL78xx modem event notifications.
  */
 int hl78xx_evt_monitor_unregister(struct hl78xx_evt_monitor_entry *mon);
+/**
+ * @brief Convert HL78xx RAT mode to standard cellular API.
+ */
+enum cellular_access_technology hl78xx_rat_to_access_tech(enum hl78xx_cell_rat_mode rat_mode);
+
 #ifdef __cplusplus
 }
 #endif

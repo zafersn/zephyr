@@ -48,16 +48,7 @@ int modem_atoi(const char *s, const int err_value, const char *desc, const char 
 		LOG_ERR("bad %s '%s' in %s", s, desc, func);
 		return err_value;
 	}
-
 	return ret;
-}
-
-bool hl78xx_is_registered(struct hl78xx_data *data)
-{
-	return (data->status.registration.network_state_current ==
-		CELLULAR_REGISTRATION_REGISTERED_HOME) ||
-	       (data->status.registration.network_state_current ==
-		CELLULAR_REGISTRATION_REGISTERED_ROAMING);
 }
 
 #define HASH_MULTIPLIER 37
@@ -68,29 +59,7 @@ uint32_t hash32(const char *str, int len)
 	for (int i = 0; i < len; ++i) {
 		h = (h * HASH_MULTIPLIER) + str[i];
 	}
-
 	return h;
-}
-
-/**
- * Portable memmem() replacement for C99.
- */
-const void *c99_memmem(const void *haystack, size_t haystacklen, const void *needle,
-		       size_t needlelen)
-{
-	if (!haystack || !needle || needlelen == 0 || haystacklen < needlelen) {
-		return NULL;
-	}
-
-	const uint8_t *h = haystack;
-
-	for (size_t i = 0; i <= haystacklen - needlelen; i++) {
-		if (memcmp(h + i, needle, needlelen) == 0) {
-			return (h + i);
-		}
-	}
-
-	return NULL;
 }
 
 #if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID) || defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
@@ -123,17 +92,14 @@ int find_apn(const char *profile, const char *associated_number, char *apn_buff,
 			while (*associated_number_prefix == ' ') {
 				associated_number_prefix++;
 			}
-
 			if (strncmp(associated_number, associated_number_prefix, prefix_len) == 0) {
 				strncpy(apn_buff, p_apn, MDM_APN_MAX_LENGTH - 1);
 				apn_buff[MDM_APN_MAX_LENGTH - 1] = '\0';
 				return 0;
 			}
 		}
-
 		token = strtok_r(NULL, ",", &saveptr);
 	}
-
 	/* No match found, clear apn_buff */
 	apn_buff[0] = '\0';
 	return -1; /* not found */
@@ -159,7 +125,6 @@ int modem_detect_apn(struct hl78xx_data *data, const char *associated_number)
 		char mmcmnc[8] = {0}; /* ICCID */
 #define APN_PREFIX_LEN ICCID_PREFIX_LEN
 #endif
-
 		strncpy(mmcmnc, associated_number, sizeof(mmcmnc) - 1);
 		mmcmnc[sizeof(mmcmnc) - 1] = '\0';
 		/* try to find a matching IMSI/ICCID, and assign the APN */
@@ -169,26 +134,28 @@ int modem_detect_apn(struct hl78xx_data *data, const char *associated_number)
 			LOG_ERR("%d %s APN Parser error %d", __LINE__, __func__, rc);
 		}
 	}
-
 	if (rc == 0) {
 		LOG_INF("Assign APN: \"%s\"", data->identity.apn);
 	} else {
 		LOG_INF("No assigned APN: \"%d\"", rc);
 	}
-
 	return rc;
 }
 #endif
 
 void set_band_bit(uint8_t *bitmap, uint16_t band_num)
 {
+	uint16_t bit_pos;
+	uint16_t byte_index;
+	uint8_t bit_index;
+
 	if (band_num < 1 || band_num > 256) {
 		return; /* Out of range */
 	}
-
-	uint16_t bit_pos = band_num - 1;
-	uint16_t byte_index = bit_pos / 8;
-	uint8_t bit_index = bit_pos % 8;
+	/* Calculate byte and bit positions */
+	bit_pos = band_num - 1;
+	byte_index = bit_pos / 8;
+	bit_index = bit_pos % 8;
 	/* Big-endian format: band 1 in byte 31, band 256 in byte 0 */
 	bitmap[byte_index] |= (1 << bit_index);
 }
@@ -198,7 +165,6 @@ static uint8_t hl78xx_generate_band_bitmap(uint8_t *bitmap)
 {
 	memset(bitmap, 0, MDM_BAND_BITMAP_LEN_BYTES);
 	/* Index is reversed: Band 1 is LSB of byte 31, Band 256 is MSB of byte 0 */
-
 #if CONFIG_MODEM_HL78XX_BAND_1
 	set_band_bit(bitmap, 1);
 #endif
@@ -290,7 +256,6 @@ static uint8_t hl78xx_generate_band_bitmap(uint8_t *bitmap)
 	set_band_bit(bitmap, 256);
 #endif
 	/* Add additional bands similarly... */
-
 	return 0;
 }
 #endif /* CONFIG_MODEM_HL78XX_CONFIGURE_BANDS */
@@ -307,22 +272,20 @@ static uint8_t hl78xx_generate_band_bitmap(uint8_t *bitmap)
  */
 static int parse_band_list(const char *band_str, int *bands, size_t max_bands)
 {
+	char buf[128] = {0};
+	char *token;
+	char *rest;
+	int count = 0;
+	int band = 0;
+
 	if (!band_str || !bands || max_bands == 0) {
 		return -EINVAL;
 	}
-
-	char buf[128] = {0};
-
 	strncpy(buf, band_str, sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
-
-	char *token;
-	char *rest = buf;
-	int count = 0;
-
+	rest = buf;
 	while ((token = strtok_r(rest, ",", &rest))) {
-		int band = atoi(token);
-
+		band = ATOI(token, -1, "band");
 		if (band <= 0) {
 			printk("Invalid band number: %s\n", token);
 			continue;
@@ -333,7 +296,6 @@ static int parse_band_list(const char *band_str, int *bands, size_t max_bands)
 		}
 		bands[count++] = band;
 	}
-
 	return count;
 }
 #endif /* CONFIG_MODEM_HL78XX_AUTORAT */
@@ -343,9 +305,7 @@ int hl78xx_generate_bitmap_from_config(enum hl78xx_cell_rat_mode rat, uint8_t *b
 	if (!bitmap_out) {
 		return -EINVAL;
 	}
-
 	memset(bitmap_out, 0, MDM_BAND_BITMAP_LEN_BYTES);
-
 #if defined(CONFIG_MODEM_HL78XX_AUTORAT)
 	/* Auto-RAT: read bands from string configs */
 	const char *band_str = NULL;
@@ -356,15 +316,16 @@ int hl78xx_generate_bitmap_from_config(enum hl78xx_cell_rat_mode rat, uint8_t *b
 		band_str = CONFIG_MODEM_HL78XX_AUTORAT_M1_BAND_CFG;
 #endif
 		break;
+
 	case HL78XX_RAT_NB1:
 #ifdef CONFIG_MODEM_HL78XX_AUTORAT_NB_BAND_CFG
 		band_str = CONFIG_MODEM_HL78XX_AUTORAT_NB_BAND_CFG;
 #endif
 		break;
+
 	default:
 		return -EINVAL;
 	}
-
 	if (band_str) {
 		int bands[MAX_BANDS];
 		int count = parse_band_list(band_str, bands, MAX_BANDS);
@@ -372,7 +333,6 @@ int hl78xx_generate_bitmap_from_config(enum hl78xx_cell_rat_mode rat, uint8_t *b
 		if (count < 0) {
 			return -EINVAL;
 		}
-
 		for (int i = 0; i < count; i++) {
 			set_band_bit(bitmap_out, bands[i]);
 		}
@@ -384,9 +344,9 @@ int hl78xx_generate_bitmap_from_config(enum hl78xx_cell_rat_mode rat, uint8_t *b
 #endif /* CONFIG_MODEM_HL78XX_AUTORAT */
 	return -EINVAL;
 }
+
 void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, size_t hex_str_len)
 {
-
 	int started = 0;
 	size_t offset = 0;
 
@@ -394,16 +354,12 @@ void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, s
 		if (!started && bitmap[i] == 0) {
 			continue; /*  Skip leading zero bytes */
 		}
-
 		started = 1;
-
 		if (offset + 2 >= hex_str_len) {
 			break;
 		}
-
 		offset += snprintk(&hex_str[offset], hex_str_len - offset, "%02X", bitmap[i]);
 	}
-
 	if (!started) {
 		strcpy(hex_str, "0");
 	}
@@ -425,7 +381,6 @@ int hl78xx_hex_string_to_bitmap(const char *hex_str, uint8_t *bitmap_out)
 		}
 		bitmap_out[i] = (uint8_t)byte_val;
 	}
-
 	return 0;
 }
 
@@ -438,15 +393,11 @@ int hl78xx_get_band_default_config_for_rat(enum hl78xx_cell_rat_mode rat, char *
 	if (size_in_bytes < MDM_BAND_HEX_STR_LEN || hex_bndcfg == NULL) {
 		return -EINVAL;
 	}
-
 	if (hl78xx_generate_bitmap_from_config(rat, bitmap) != 0) {
 		return -EINVAL;
 	}
-
 	hl78xx_bitmap_to_hex_string_trimmed(bitmap, hex_str, sizeof(hex_str));
-
 	LOG_INF("Default band config: %s", hex_str);
-
 	strncpy(hex_bndcfg, hex_str, MDM_BAND_HEX_STR_LEN);
 	return 0;
 }
@@ -472,17 +423,15 @@ static void strip_quotes(char *str)
 
 void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn, size_t max_len)
 {
-
 	char apn_buf[max_len];
+	size_t len;
+	const char *mnc_ptr;
 
 	strncpy(apn_buf, full_apn, sizeof(apn_buf) - 1);
 	apn_buf[sizeof(apn_buf) - 1] = '\0';
 	/*  Remove surrounding quotes if any */
 	strip_quotes(apn_buf);
-
-	const char *mnc_ptr = strstr(apn_buf, ".mnc");
-	size_t len;
-
+	mnc_ptr = strstr(apn_buf, ".mnc");
 	if (mnc_ptr != NULL) {
 		len = mnc_ptr - apn_buf;
 		if (len >= max_len) {
@@ -495,22 +444,4 @@ void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn
 		strncpy(essential_apn, apn_buf, max_len - 1);
 		essential_apn[max_len - 1] = '\0';
 	}
-}
-
-/* Small utility: safe strncpy that always NUL-terminates the destination. */
-void safe_strncpy(char *dst, const char *src, size_t dst_size)
-{
-	if (dst == NULL || dst_size == 0) {
-		return;
-	}
-
-	if (src == NULL) {
-		dst[0] = '\0';
-		return;
-	}
-
-	size_t len = MIN(strlen(src), dst_size - 1);
-
-	strncpy(dst, src, len);
-	dst[len] = '\0';
 }
