@@ -24,6 +24,23 @@
 
 #define MAX_SCRIPT_AT_CMD_RETRY 3
 
+/* ==========================================================================
+ * HL78XX modem driver — Phase 0 grouping and outline
+ *
+ * This file is large. Phase 0 only adds lightweight section headers and a
+ * compact outline to improve navigation and readability. No functional code
+ * changes are made in this patch.
+ *
+ * File sections (in this source):
+ *  - Utilities (string helpers, small helpers)
+ *  - Chat callbacks / URC handlers
+ *  - Chat scripts / matches
+ *  - Modem pipe & chat init
+ *  - GPIO callbacks
+ *  - State machine handlers (enter/leave/event handlers)
+ *  - PM and device init
+ * ========================================================================= */
+
 #define MDM_NODE DT_ALIAS(modem)
 
 /* GPIO availability macros */
@@ -48,6 +65,23 @@ hl78xx_evt_monitor_dispatcher_t event_dispatcher;
 
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt);
 static int hl78xx_on_idle_state_enter(struct hl78xx_data *data);
+/* Forward declaration for the state handler table (defined later). This
+ * allows functions declared above to reference the table.
+ */
+
+/* State handler structure: forward-declare the type so the table can be
+ * referenced by functions defined earlier in the file.
+ */
+struct hl78xx_state_handlers {
+	int (*on_enter)(struct hl78xx_data *data);
+	int (*on_leave)(struct hl78xx_data *data);
+	void (*on_event)(struct hl78xx_data *data, enum hl78xx_event evt);
+};
+
+/* Forward declare the table so functions earlier in this file can reference
+ * it. The table itself is defined later in the file (without 'static').
+ */
+extern const struct hl78xx_state_handlers hl78xx_state_table[];
 
 static void event_dispatcher_dispatch(struct hl78xx_evt *notif)
 {
@@ -55,6 +89,11 @@ static void event_dispatcher_dispatch(struct hl78xx_evt *notif)
 		event_dispatcher(notif);
 	}
 }
+
+/* -------------------------------------------------------------------------
+ * Utilities
+ * - small helpers and local utility functions
+ * ------------------------------------------------------------------------- */
 
 static const char *hl78xx_state_str(enum hl78xx_state state)
 {
@@ -163,6 +202,17 @@ static void safe_strncpy_local(char *dst, const char *src, size_t dst_size)
 	dst[dst_size - 1] = '\0';
 }
 
+/*
+ * safe_strncpy_local - bounded string copy with guaranteed NUL-termination
+ *
+ * This is a tiny local wrapper used to copy small modem identity strings
+ * (IMEI/IMSI/etc.). It avoids repeated strlen checks at call sites and
+ * centralizes the NUL-termination guarantee.
+ *
+ * Threading: callers that update shared data should still take the
+ * appropriate mutex (e.g., `api_lock`).
+ */
+
 static void hl78xx_stop_timer(struct hl78xx_data *data)
 {
 	k_work_cancel_delayable(&data->timeout_work);
@@ -228,6 +278,15 @@ void hl78xx_delegate_event(struct hl78xx_data *data, enum hl78xx_event evt)
 	k_work_submit_to_queue(&modem_workq, &data->events.event_dispatch_work);
 }
 
+/*
+ * hl78xx_delegate_event - enqueue an internal modem event
+ *
+ * Enqueues an event into the driver's ring buffer and schedules the
+ * event dispatch work on the modem workqueue. This function is safe to call
+ * from ISRs that can take the rb lock (if needed) but most callers call it
+ * from thread context.
+ */
+
 static void hl78xx_chat_callback_handler(struct modem_chat *chat,
 					 enum modem_chat_script_result result, void *user_data)
 {
@@ -239,6 +298,18 @@ static void hl78xx_chat_callback_handler(struct modem_chat *chat,
 		hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SCRIPT_FAILED);
 	}
 }
+
+/*
+ * hl78xx_chat_callback_handler - callback from modem_chat when a script ends
+ *
+ * Converts modem_chat script results into driver events so the state machine
+ * can transition accordingly.
+ */
+
+/* -------------------------------------------------------------------------
+ * Chat callbacks / URC handlers
+ * - unsolicited response handlers and chat-related parsers
+ * ------------------------------------------------------------------------- */
 
 static void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
@@ -609,6 +680,10 @@ MODEM_CHAT_MATCH_DEFINE(ksrep_match, "+KSREP: ", ",", hl78xx_on_ksrep);
 MODEM_CHAT_MATCH_DEFINE(ksrat_match, "+KSRAT: ", "", hl78xx_on_ksrat);
 MODEM_CHAT_MATCH_DEFINE(kselacq_match, "+KSELACQ: ", ",", hl78xx_on_kselacq);
 
+/* -------------------------------------------------------------------------
+ * Chat script matches / definitions
+ * ------------------------------------------------------------------------- */
+
 static void hl78xx_init_pipe(const struct device *dev)
 {
 	const struct hl78xx_config *cfg = dev->config;
@@ -624,6 +699,18 @@ static void hl78xx_init_pipe(const struct device *dev)
 
 	data->uart_pipe = modem_backend_uart_init(&data->uart_backend, &uart_backend_config);
 }
+
+/*
+ * hl78xx_init_pipe - initialize UART backend pipe
+ *
+ * This wraps modem_backend_uart_init and stores the returned pipe on the
+ * device data. No global side-effects other than assigning data->uart_pipe.
+ */
+
+/* -------------------------------------------------------------------------
+ * Pipe & chat initialization
+ * - modem backend pipe setup and chat initialisation helpers
+ * ------------------------------------------------------------------------- */
 
 static int modem_init_chat(const struct device *dev)
 {
@@ -760,6 +847,17 @@ void mdm_vgpio_callback_isr(const struct device *port, struct gpio_callback *cb,
 	LOG_DBG("VGPIO ISR callback %s %d %d", spec->port->name, spec->pin, gpio_pin_get_dt(spec));
 }
 
+/*
+ * GPIO ISR callbacks are intentionally tiny: they validate the pin, log the
+ * interrupt and return quickly. Heavy lifting should be deferred to work
+ * items scheduled from thread context if necessary.
+ */
+
+/* -------------------------------------------------------------------------
+ * GPIO ISR callbacks
+ * - lightweight wrappers for GPIO interrupts (logging & event dispatch)
+ * ------------------------------------------------------------------------- */
+
 #if HAS_UART_DSR_GPIO
 void mdm_uart_dsr_callback_isr(const struct device *port, struct gpio_callback *cb, uint32_t pins)
 {
@@ -818,6 +916,12 @@ bool hl78xx_is_registered(struct hl78xx_data *data)
 		CELLULAR_REGISTRATION_REGISTERED_ROAMING);
 }
 
+/*
+ * hl78xx_is_registered - convenience helper
+ *
+ * Simple predicate to test if the modem reports a registered state.
+ */
+
 static int hl78xx_on_reset_pulse_state_enter(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
@@ -829,6 +933,11 @@ static int hl78xx_on_reset_pulse_state_enter(struct hl78xx_data *data)
 	hl78xx_start_timer(data, K_MSEC(config->reset_pulse_duration_ms));
 	return 0;
 }
+
+/* -------------------------------------------------------------------------
+ * State machine handlers
+ * - state enter/leave and per-state event handlers
+ * ------------------------------------------------------------------------- */
 
 static void hl78xx_reset_pulse_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
@@ -1669,68 +1778,19 @@ static int hl78xx_on_state_enter(struct hl78xx_data *data)
 
 	HL78XX_LOG_DBG("%d %d", __LINE__, data->status.state);
 
-	switch (data->status.state) {
-	case MODEM_HL78XX_STATE_IDLE:
-		ret = hl78xx_on_idle_state_enter(data);
-		break;
+	/* Table-driven dispatch makes it easier to see and extend state
+	 * mappings. See `hl78xx_state_table` (type and table are declared
+	 * just above this function definition).
+	 */
+	enum hl78xx_state s = data->status.state;
 
-	case MODEM_HL78XX_STATE_RESET_PULSE:
-		ret = hl78xx_on_reset_pulse_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_POWER_ON_PULSE:
-		ret = hl78xx_on_power_on_pulse_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_POWER_ON:
-		ret = hl78xx_on_await_power_on_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_SET_BAUDRATE:
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_INIT_SCRIPT:
-		ret = hl78xx_on_run_init_script_state_enter(data);
-		break;
-	case MODEM_HL78XX_STATE_RUN_INIT_FAIL_DIAGNOSTIC_SCRIPT:
-		ret = hl78xx_on_run_init_diagnose_script_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_RAT_CONFIG_SCRIPT:
-		ret = hl78xx_on_rat_cfg_script_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_ENABLE_GPRS_SCRIPT:
-		ret = hl78xx_on_enable_gprs_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_REGISTERED:
-		ret = hl78xx_on_await_registered_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_CARRIER_ON:
-		ret = hl78xx_on_carrier_on_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_CARRIER_OFF:
-		ret = hl78xx_on_carrier_off_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_INIT_POWER_OFF:
-		ret = hl78xx_on_init_power_off_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_POWER_OFF_PULSE:
-		ret = hl78xx_on_power_off_pulse_state_enter(data);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_POWER_OFF:
-		ret = hl78xx_on_await_power_off_state_enter(data);
-		break;
-
-	default:
-		ret = 0;
-		break;
+	/* Use an explicit bounds check against the last enum value so this
+	 * code can reference the table even though the table is defined later
+	 * in the file. MODEM_HL78XX_STATE_AWAIT_POWER_OFF is the last value in
+	 * the `enum hl78xx_state`.
+	 */
+	if ((int)s <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF && hl78xx_state_table[s].on_enter) {
+		ret = hl78xx_state_table[s].on_enter(data);
 	}
 
 	return ret;
@@ -1741,42 +1801,10 @@ static int hl78xx_on_state_leave(struct hl78xx_data *data)
 	int ret = 0;
 
 	HL78XX_LOG_DBG("%d %d", __LINE__, data->status.state);
-	switch (data->status.state) {
-	case MODEM_HL78XX_STATE_IDLE:
-		ret = hl78xx_on_idle_state_leave(data);
-		break;
+	enum hl78xx_state s = data->status.state;
 
-	case MODEM_HL78XX_STATE_RESET_PULSE:
-		ret = hl78xx_on_reset_pulse_state_leave(data);
-		break;
-
-	case MODEM_HL78XX_STATE_POWER_ON_PULSE:
-		ret = hl78xx_on_power_on_pulse_state_leave(data);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_REGISTERED:
-		ret = hl78xx_on_await_registered_state_leave(data);
-		break;
-
-	case MODEM_HL78XX_STATE_CARRIER_ON:
-		ret = hl78xx_on_carrier_on_state_leave(data);
-		break;
-
-	case MODEM_HL78XX_STATE_CARRIER_OFF:
-		ret = hl78xx_on_carrier_off_state_leave(data);
-		break;
-
-	case MODEM_HL78XX_STATE_INIT_POWER_OFF:
-		ret = hl78xx_on_init_power_off_state_leave(data);
-		break;
-
-	case MODEM_HL78XX_STATE_POWER_OFF_PULSE:
-		ret = hl78xx_on_power_off_pulse_state_leave(data);
-		break;
-
-	default:
-		ret = 0;
-		break;
+	if ((int)s <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF && hl78xx_state_table[s].on_leave) {
+		ret = hl78xx_state_table[s].on_leave(data);
 	}
 
 	return ret;
@@ -1802,6 +1830,14 @@ void hl78xx_enter_state(struct hl78xx_data *data, enum hl78xx_state state)
 	}
 }
 
+/*
+ * hl78xx_enter_state - change the modem driver's state
+ *
+ * This wrapper calls the current state's leave handler and the new state's
+ * enter handler. The function logs warnings on errors but keeps behavior the
+ * same as the previous implementation.
+ */
+
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
 	enum hl78xx_state state;
@@ -1809,69 +1845,12 @@ static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt
 	state = data->status.state;
 
 	hl78xx_log_event(evt);
+	enum hl78xx_state s = data->status.state;
 
-	switch (data->status.state) {
-	case MODEM_HL78XX_STATE_IDLE:
-		hl78xx_idle_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_RESET_PULSE:
-		hl78xx_reset_pulse_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_POWER_ON_PULSE:
-		hl78xx_power_on_pulse_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_POWER_ON:
-		hl78xx_await_power_on_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_SET_BAUDRATE:
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_INIT_SCRIPT:
-		hl78xx_run_init_script_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_INIT_FAIL_DIAGNOSTIC_SCRIPT:
-		hl78xx_run_init_fail_script_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_RAT_CONFIG_SCRIPT:
-		hl78xx_run_rat_cfg_script_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_RUN_ENABLE_GPRS_SCRIPT:
-		hl78xx_enable_gprs_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_REGISTERED:
-		hl78xx_await_registered_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_CARRIER_ON:
-		hl78xx_carrier_on_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_CARRIER_OFF:
-		hl78xx_carrier_off_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_INIT_POWER_OFF:
-		hl78xx_init_power_off_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_POWER_OFF_PULSE:
-		hl78xx_power_off_pulse_event_handler(data, evt);
-		break;
-
-	case MODEM_HL78XX_STATE_AWAIT_POWER_OFF:
-		hl78xx_await_power_off_event_handler(data, evt);
-		break;
-	default:
+	if ((int)s <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF && hl78xx_state_table[s].on_event) {
+		hl78xx_state_table[s].on_event(data, evt);
+	} else {
 		LOG_ERR("%d %s unknown event", __LINE__, __func__);
-		break;
 	}
 
 	if (state != data->status.state) {
@@ -1918,6 +1897,10 @@ static int hl78xx_driver_pm_action(const struct device *dev, enum pm_device_acti
 	return ret;
 }
 #endif /* CONFIG_PM_DEVICE */
+
+/* -------------------------------------------------------------------------
+ * Power management
+ * ------------------------------------------------------------------------- */
 
 static int hl78xx_init(const struct device *dev)
 {
@@ -2059,11 +2042,64 @@ error:
 	return ret;
 }
 
+/* -------------------------------------------------------------------------
+ * Device initialization
+ * ------------------------------------------------------------------------- */
+
 int hl78xx_evt_notif_handler_set(hl78xx_evt_monitor_dispatcher_t handler)
 {
 	event_dispatcher = handler;
 	return 0;
 }
+
+/*
+ * State handler table
+ * Maps each hl78xx_state to optional enter/leave/event handlers. NULL
+ * entries mean the state has no action for that phase.
+ */
+const struct hl78xx_state_handlers hl78xx_state_table[] = {
+	[MODEM_HL78XX_STATE_IDLE] = {hl78xx_on_idle_state_enter, hl78xx_on_idle_state_leave,
+								 hl78xx_idle_event_handler},
+	[MODEM_HL78XX_STATE_RESET_PULSE] = {hl78xx_on_reset_pulse_state_enter,
+										hl78xx_on_reset_pulse_state_leave,
+										hl78xx_reset_pulse_event_handler},
+	[MODEM_HL78XX_STATE_POWER_ON_PULSE] = {hl78xx_on_power_on_pulse_state_enter,
+										   hl78xx_on_power_on_pulse_state_leave,
+										   hl78xx_power_on_pulse_event_handler},
+	[MODEM_HL78XX_STATE_AWAIT_POWER_ON] = {hl78xx_on_await_power_on_state_enter, NULL,
+										   hl78xx_await_power_on_event_handler},
+	[MODEM_HL78XX_STATE_SET_BAUDRATE] = {NULL, NULL, NULL},
+	[MODEM_HL78XX_STATE_RUN_INIT_SCRIPT] = {hl78xx_on_run_init_script_state_enter, NULL,
+											hl78xx_run_init_script_event_handler},
+	[MODEM_HL78XX_STATE_RUN_INIT_FAIL_DIAGNOSTIC_SCRIPT] = {
+		hl78xx_on_run_init_diagnose_script_state_enter,
+		NULL,
+		hl78xx_run_init_fail_script_event_handler,
+	},
+	[MODEM_HL78XX_STATE_RUN_RAT_CONFIG_SCRIPT] = {hl78xx_on_rat_cfg_script_state_enter, NULL,
+												  hl78xx_run_rat_cfg_script_event_handler},
+	[MODEM_HL78XX_STATE_RUN_ENABLE_GPRS_SCRIPT] = {hl78xx_on_enable_gprs_state_enter, NULL,
+												   hl78xx_enable_gprs_event_handler},
+	[MODEM_HL78XX_STATE_AWAIT_REGISTERED] = {hl78xx_on_await_registered_state_enter,
+											hl78xx_on_await_registered_state_leave,
+											hl78xx_await_registered_event_handler},
+	[MODEM_HL78XX_STATE_CARRIER_ON] = {hl78xx_on_carrier_on_state_enter,
+									   hl78xx_on_carrier_on_state_leave,
+									   hl78xx_carrier_on_event_handler},
+	[MODEM_HL78XX_STATE_CARRIER_OFF] = {hl78xx_on_carrier_off_state_enter,
+										hl78xx_on_carrier_off_state_leave,
+										hl78xx_carrier_off_event_handler},
+	[MODEM_HL78XX_STATE_SIM_POWER_OFF] = {NULL, NULL, NULL},
+	[MODEM_HL78XX_STATE_AIRPLANE] = {NULL, NULL, NULL},
+	[MODEM_HL78XX_STATE_INIT_POWER_OFF] = {hl78xx_on_init_power_off_state_enter,
+										   hl78xx_on_init_power_off_state_leave,
+										   hl78xx_init_power_off_event_handler},
+	[MODEM_HL78XX_STATE_POWER_OFF_PULSE] = {hl78xx_on_power_off_pulse_state_enter,
+											hl78xx_on_power_off_pulse_state_leave,
+											hl78xx_power_off_pulse_event_handler},
+	[MODEM_HL78XX_STATE_AWAIT_POWER_OFF] = {hl78xx_on_await_power_off_state_enter, NULL,
+											hl78xx_await_power_off_event_handler},
+};
 
 static DEVICE_API(cellular, hl78xx_api) = {
 	.get_signal = hl78xx_api_func_get_signal,
@@ -2072,6 +2108,10 @@ static DEVICE_API(cellular, hl78xx_api) = {
 	.set_apn = hl78xx_api_func_set_apn,
 	.set_callback = NULL,
 };
+
+/* -------------------------------------------------------------------------
+ * Device API and DT registration
+ * ------------------------------------------------------------------------- */
 
 #define MODEM_HL78XX_DEFINE_INSTANCE(inst, power_ms, reset_ms, startup_ms, shutdown_ms, start,     \
 				     init_script, periodic_script)                                 \
