@@ -24,22 +24,6 @@
 
 #define MAX_SCRIPT_AT_CMD_RETRY 3
 
-/* Small utility: safe strncpy that always NUL-terminates the destination. */
-static void safe_strncpy_local(char *dst, const char *src, size_t dst_size)
-{
-	if (dst == NULL || dst_size == 0) {
-		return;
-	}
-
-	if (src == NULL) {
-		dst[0] = '\0';
-		return;
-	}
-
-	strncpy(dst, src, dst_size - 1);
-	dst[dst_size - 1] = '\0';
-}
-
 #define MDM_NODE DT_ALIAS(modem)
 
 /* GPIO availability macros */
@@ -161,6 +145,22 @@ static void hl78xx_log_event(enum hl78xx_event evt)
 static void hl78xx_start_timer(struct hl78xx_data *data, k_timeout_t timeout)
 {
 	k_work_schedule(&data->timeout_work, timeout);
+}
+
+/* Small utility: safe strncpy that always NUL-terminates the destination. */
+static void safe_strncpy_local(char *dst, const char *src, size_t dst_size)
+{
+	if (dst == NULL || dst_size == 0) {
+		return;
+	}
+
+	if (src == NULL) {
+		dst[0] = '\0';
+		return;
+	}
+
+	strncpy(dst, src, dst_size - 1);
+	dst[dst_size - 1] = '\0';
 }
 
 static void hl78xx_stop_timer(struct hl78xx_data *data)

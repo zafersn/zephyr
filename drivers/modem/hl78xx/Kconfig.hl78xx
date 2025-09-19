@@ -311,7 +311,7 @@ menuconfig MODEM_HL78XX_CONFIGURE_BANDS
 	  HL78XX modem should use at boot time.
 
 if MODEM_HL78XX_CONFIGURE_BANDS
-
+if !MODEM_HL78XX_RAT_NBNTN
 config MODEM_HL78XX_BAND_1
 	bool "Band 1  (2000MHz)"
 	default y
@@ -390,12 +390,13 @@ config MODEM_HL78XX_BAND_20
 	default y
 	help
 	  Enable Band 20 (800MHz)
-
+endif # !MODEM_HL78XX_RAT_NBNTN
 config MODEM_HL78XX_BAND_23
 	bool "Band 23 (2000MHz)"
+	default y if MODEM_HL78XX_RAT_NBNTN
 	help
 	  Enable Band 23 (2000MHz)
-
+if !MODEM_HL78XX_RAT_NBNTN
 config MODEM_HL78XX_BAND_25
 	bool "Band 25 (1900MHz)"
 	help
@@ -461,18 +462,85 @@ config MODEM_HL78XX_BAND_107
 	bool "Band 107 (1800MHz)"
 	help
 	  Enable Band 107 (1800MHz)
-
+endif # !MODEM_HL78XX_RAT_NBNTN
 config MODEM_HL78XX_BAND_255
 	bool "Band 255 (1500MHz)"
+	default y if MODEM_HL78XX_RAT_NBNTN
 	help
 	  Enable Band 255 (1500MHz)
 
 config MODEM_HL78XX_BAND_256
 	bool "Band 256 (2000MHz)"
+	default y if MODEM_HL78XX_RAT_NBNTN
 	help
 	  Enable Band 256 (2000MHz)
 
 endif # MODEM_HL78XX_CONFIGURE_BAND
+
+# NB-IoT NTN Position Configuration
+if MODEM_HL78XX_RAT_NBNTN
+menuconfig MODEM_HL78XX_NBNTN_POSITIONING
+	bool "NB-IoT NTN Position Configuration"
+	depends on !MODEM_HL78XX_AUTORAT
+	default y if !MODEM_HL78XX_AUTORAT
+	help
+	  Choose this setting to configure NB-IoT NTN Positioning parameters.
+	  Only applicable if NB-NTN mode is selected (MODEM_HL78XX_RAT_NBNTN).
+choice
+    prompt "Position Source"
+    default NTN_POSITION_SOURCE_IGNSS
+    help
+        Select the source of UE (User Equipment) position for NTN TA calculation.
+        IGNSS: Use HL781x internal GNSS to acquire position automatically.
+        MANUAL: Manually enter UE position using +KNTNCMD AT command.
+
+config NTN_POSITION_SOURCE_IGNSS
+    bool "IGNSS (internal GNSS)"
+    help
+        Use HL781x internal GNSS to acquire position automatically.
+
+config NTN_POSITION_SOURCE_MANUAL
+    bool "MANUAL (manual entry)"
+    help
+        Manually enter UE position using +KNTNCMD AT command.
+
+endchoice
+
+choice
+    prompt "Mobility Type"
+    default NTN_MOBILITY_TYPE_STATIC
+    help
+        Specify the UE's mobility type.
+        STATIC: Position remains fixed (within 600 meters of initial fix).
+        DYNAMIC: Position may change, requires update for each network operation.
+
+config NTN_MOBILITY_TYPE_STATIC
+    bool "STATIC (fixed position)"
+    help
+        Position remains fixed (within 600 meters of initial fix).
+
+config NTN_MOBILITY_TYPE_DYNAMIC
+    bool "DYNAMIC (moving position)"
+    help
+        Position may change, requires update for each network operation.
+
+endchoice
+
+config NTN_STATIC_THRESHOLD
+    int "Static Mode Threshold (meters)"
+    default 600
+    help
+        Distance between current position and initial fix that determines static/dynamic mode.
+        If position variation exceeds this threshold, dynamic mode is recommended.
+        For documentation/reference only.
+
+config NTN_DYNAMIC_POSREQ_UPDATE
+    bool "Require position update on POSREQ in Dynamic Mode"
+    default y
+    help
+        If enabled, the UE position must be updated after receiving unsolicited +KNTNEV: 'POSREQ' indication,
+        before any outgoing network operation in dynamic mode.
+endif # MODEM_HL78XX_RAT_NBNTN
 
 config MODEM_HL78XX_LOW_POWER_MODE
 	bool "Low power modes"
