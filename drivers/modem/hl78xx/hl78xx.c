@@ -287,31 +287,15 @@ void hl78xx_delegate_event(struct hl78xx_data *data, enum hl78xx_event evt)
  * from thread context.
  */
 
-static void hl78xx_chat_callback_handler(struct modem_chat *chat,
-					 enum modem_chat_script_result result, void *user_data)
-{
-	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
-
-	if (result == MODEM_CHAT_SCRIPT_RESULT_SUCCESS) {
-		hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SCRIPT_SUCCESS);
-	} else {
-		hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SCRIPT_FAILED);
-	}
-}
-
-/*
- * hl78xx_chat_callback_handler - callback from modem_chat when a script ends
- *
- * Converts modem_chat script results into driver events so the state machine
- * can transition accordingly.
- */
+/* Chat callbacks and scripts are implemented in hl78xx_chat.c */
+#include "hl78xx_chat.h"
 
 /* -------------------------------------------------------------------------
  * Chat callbacks / URC handlers
  * - unsolicited response handlers and chat-related parsers
  * ------------------------------------------------------------------------- */
 
-static void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 	enum cellular_registration_status registration_status = 0;
@@ -358,7 +342,7 @@ static void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc,
 	event_dispatcher_dispatch(&event);
 }
 
-static void hl78xx_on_ksup(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_ksup(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	int module_status;
 	struct hl78xx_evt event = {.type = HL78XX_LTE_MODEM_STARTUP};
@@ -372,7 +356,7 @@ static void hl78xx_on_ksup(struct modem_chat *chat, char **argv, uint16_t argc, 
 	HL78XX_LOG_DBG("Module status: %d", module_status);
 }
 
-static void hl78xx_on_imei(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_imei(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -385,7 +369,7 @@ static void hl78xx_on_imei(struct modem_chat *chat, char **argv, uint16_t argc, 
 	k_mutex_unlock(&data->api_lock);
 }
 
-static void hl78xx_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -399,7 +383,7 @@ static void hl78xx_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc, 
 	k_mutex_unlock(&data->api_lock);
 }
 
-static void hl78xx_on_imsi(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_imsi(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -416,7 +400,7 @@ static void hl78xx_on_imsi(struct modem_chat *chat, char **argv, uint16_t argc, 
 #endif /* CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI */
 }
 
-static void hl78xx_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -430,7 +414,7 @@ static void hl78xx_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc, 
 	k_mutex_unlock(&data->api_lock);
 }
 
-static void hl78xx_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -444,7 +428,7 @@ static void hl78xx_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc, 
 	k_mutex_unlock(&data->api_lock);
 }
 
-static void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -463,7 +447,7 @@ static void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc,
 }
 
 /* Handler: +KSTATEV: */
-static void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 	enum hl78xx_cell_rat_mode rat_mode = HL78XX_RAT_MODE_NONE;
@@ -485,7 +469,7 @@ static void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t arg
 	}
 }
 
-static void hl78xx_on_udprcv(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_udprcv(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	if (argc < 2) {
 		return;
@@ -493,8 +477,8 @@ static void hl78xx_on_udprcv(struct modem_chat *chat, char **argv, uint16_t argc
 	HL78XX_LOG_DBG("%d %d [%s] [%s] [%s]", __LINE__, argc, argv[0], argv[1], argv[2]);
 }
 
-static void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint16_t argc,
-				     void *user_data)
+void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint16_t argc,
+					 void *user_data)
 {
 	int socket_id = -1;
 	int new_total = -1;
@@ -512,7 +496,7 @@ static void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint1
 }
 
 /** +KTCP_NOTIF: <session_id>, <tcp_notif> */
-static void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t argc,
+void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t argc,
 				void *user_data)
 {
 	int socket_id = -1;
@@ -530,7 +514,7 @@ static void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t a
 	tcp_notify_data(socket_id, tcp_notif, user_data);
 }
 
-static void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -540,7 +524,7 @@ static void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc,
 	data->status.ksrep = ATOI(argv[1], 0, "ksrep");
 	HL78XX_LOG_DBG("KSREP: %s %s", argv[0], argv[1]);
 }
-static void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 	struct hl78xx_evt event = {.type = HL78XX_LTE_RAT_UPDATE};
@@ -554,7 +538,7 @@ static void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc,
 	HL78XX_LOG_DBG("KSRAT: %s %s", argv[0], argv[1]);
 }
 
-static void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -577,7 +561,7 @@ static void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t arg
 		       data->kselacq_data.rat3);
 }
 
-static void hl78xx_on_kbndcfg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_kbndcfg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 	uint8_t rat_id;
@@ -603,7 +587,7 @@ static void hl78xx_on_kbndcfg(struct modem_chat *chat, char **argv, uint16_t arg
 	data->status.kbndcfg[rat_id].bnd_bitmap[kbnd_bitmap_size] = '\0';
 }
 
-static void hl78xx_on_csq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_csq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -614,7 +598,7 @@ static void hl78xx_on_csq(struct modem_chat *chat, char **argv, uint16_t argc, v
 	data->status.rssi = ATOI(argv[1], 0, "rssi");
 }
 
-static void hl78xx_on_cesq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cesq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -626,7 +610,7 @@ static void hl78xx_on_cesq(struct modem_chat *chat, char **argv, uint16_t argc, 
 	data->status.rsrp = ATOI(argv[6], 0, "rsrp");
 }
 
-static void hl78xx_on_cfun(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cfun(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -638,7 +622,7 @@ static void hl78xx_on_cfun(struct modem_chat *chat, char **argv, uint16_t argc, 
 	data->status.phone_functionality.in_progress = false;
 }
 
-static void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
@@ -650,38 +634,9 @@ static void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, 
 	data->status.network_operator.format = ATOI(argv[2], 0, "network_operator_format");
 }
 
-MODEM_CHAT_MATCH_DEFINE(ok_match, OK_STRING, "", NULL);
-MODEM_CHAT_MATCHES_DEFINE(allow_match, MODEM_CHAT_MATCH(OK_STRING, "", NULL),
-			  MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
-
-MODEM_CHAT_MATCHES_DEFINE(unsol_matches, MODEM_CHAT_MATCH("+CREG: ", ",", hl78xx_on_cxreg),
-			  MODEM_CHAT_MATCH("+CEREG: ", ",", hl78xx_on_cxreg),
-			  MODEM_CHAT_MATCH("+CGREG: ", ",", hl78xx_on_cxreg),
-			  MODEM_CHAT_MATCH("+KSTATEV: ", ",", hl78xx_on_kstatev),
-			  MODEM_CHAT_MATCH("+KUDP_DATA: ", ",", hl78xx_on_socknotifydata),
-			  MODEM_CHAT_MATCH("+KTCP_DATA: ", ",", hl78xx_on_socknotifydata),
-			  MODEM_CHAT_MATCH("+KTCP_NOTIF: ", ",", hl78xx_on_ktcpnotif),
-			  MODEM_CHAT_MATCH("+KUDP_RCV: ", ",", hl78xx_on_udprcv),
-			  MODEM_CHAT_MATCH("+KBNDCFG: ", ",", hl78xx_on_kbndcfg),
-			  MODEM_CHAT_MATCH("+CSQ: ", ",", hl78xx_on_csq),
-			  MODEM_CHAT_MATCH("+CESQ: ", ",", hl78xx_on_cesq),
-			  MODEM_CHAT_MATCH("+CFUN: ", "", hl78xx_on_cfun),
-			  MODEM_CHAT_MATCH("+COPS: ", ",", hl78xx_on_cops));
-
-MODEM_CHAT_MATCHES_DEFINE(abort_matches, MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
-MODEM_CHAT_MATCH_DEFINE(at_ready_match, "+KSUP: ", "", hl78xx_on_ksup);
-MODEM_CHAT_MATCH_DEFINE(imei_match, "", "", hl78xx_on_imei);
-MODEM_CHAT_MATCH_DEFINE(cgmm_match, "", "", hl78xx_on_cgmm);
-MODEM_CHAT_MATCH_DEFINE(cimi_match, "", "", hl78xx_on_imsi);
-MODEM_CHAT_MATCH_DEFINE(cgmi_match, "", "", hl78xx_on_cgmi);
-MODEM_CHAT_MATCH_DEFINE(cgmr_match, "", "", hl78xx_on_cgmr);
-MODEM_CHAT_MATCH_DEFINE(iccid_match, "+CCID: ", "", hl78xx_on_iccid);
-MODEM_CHAT_MATCH_DEFINE(ksrep_match, "+KSREP: ", ",", hl78xx_on_ksrep);
-MODEM_CHAT_MATCH_DEFINE(ksrat_match, "+KSRAT: ", "", hl78xx_on_ksrat);
-MODEM_CHAT_MATCH_DEFINE(kselacq_match, "+KSELACQ: ", ",", hl78xx_on_kselacq);
-
 /* -------------------------------------------------------------------------
  * Chat script matches / definitions
+ * (moved to hl78xx_chat.c)
  * ------------------------------------------------------------------------- */
 
 static void hl78xx_init_pipe(const struct device *dev)
@@ -700,18 +655,7 @@ static void hl78xx_init_pipe(const struct device *dev)
 	data->uart_pipe = modem_backend_uart_init(&data->uart_backend, &uart_backend_config);
 }
 
-/*
- * hl78xx_init_pipe - initialize UART backend pipe
- *
- * This wraps modem_backend_uart_init and stores the returned pipe on the
- * device data. No global side-effects other than assigning data->uart_pipe.
- */
-
-/* -------------------------------------------------------------------------
- * Pipe & chat initialization
- * - modem backend pipe setup and chat initialisation helpers
- * ------------------------------------------------------------------------- */
-
+/* Initialize the modem chat subsystem using wrappers from hl78xx_chat.c */
 static int modem_init_chat(const struct device *dev)
 {
 	struct hl78xx_data *data = dev->data;
@@ -725,51 +669,30 @@ static int modem_init_chat(const struct device *dev)
 		.filter = data->buffers.filter,
 		.filter_size = data->buffers.filter ? strlen(data->buffers.filter) : 0,
 		.argv = data->buffers.argv,
-		.argv_size = ARRAY_SIZE(data->buffers.argv),
-		.unsol_matches = unsol_matches,
-		.unsol_matches_size = ARRAY_SIZE(unsol_matches),
+		.argv_size = (uint16_t)(sizeof(data->buffers.argv) / sizeof(data->buffers.argv[0])),
+		.unsol_matches = hl78xx_get_unsol_matches(),
+		.unsol_matches_size = (uint16_t)hl78xx_get_unsol_matches_size(),
 	};
 
 	return modem_chat_init(&data->chat, &chat_config);
 }
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_periodic_chat_script_cmds,
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEREG?", ok_match));
+/*
+ * hl78xx_init_pipe - initialize UART backend pipe
+ *
+ * This wraps modem_backend_uart_init and stores the returned pipe on the
+ * device data. No global side-effects other than assigning data->uart_pipe.
+ */
 
-MODEM_CHAT_SCRIPT_DEFINE(hl78xx_periodic_chat_script, hl78xx_periodic_chat_script_cmds,
-			 abort_matches, hl78xx_chat_callback_handler, 4);
+/* -------------------------------------------------------------------------
+ * Pipe & chat initialization
+ * - modem backend pipe setup and chat initialisation helpers
+ * ------------------------------------------------------------------------- */
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(
-	hl78xx_init_chat_script_cmds, MODEM_CHAT_SCRIPT_CMD_RESP("", at_ready_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KHWIOCFG=3,1,6", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("ATE0", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP_MULT("AT+CGACT=0", allow_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP(SET_AIRPLANE_MODE_CMD_LEGACY, ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSLEEP=2", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CPSMS=0", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEDRXS=0", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KPATTERN="
-				   "\"" EOF_PATTERN "\"",
-				   ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CCID", iccid_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CMEE=1", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", imei_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", cgmm_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMI", cgmi_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMR", cgmr_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CIMI", cimi_match), MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGEREP=2", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSELACQ?", kselacq_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSRAT?", ksrat_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KBNDCFG?", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGACT?", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CREG=0", ok_match),
-	MODEM_CHAT_SCRIPT_CMD_RESP(
-		"AT+CEREG=" CONFIG_MODEM_HL78XX_NETWORK_REG_STATUS_REPORT_CFG_CODE, ok_match));
-
-MODEM_CHAT_SCRIPT_DEFINE(hl78xx_init_chat_script, hl78xx_init_chat_script_cmds, abort_matches,
-			 hl78xx_chat_callback_handler, 10);
+/* Chat script matches / definitions are implemented in hl78xx_chat.c
+ * and exposed via hl78xx_chat.h wrapper helpers. This avoids compile-time
+ * dependence on MODEM_CHAT_* macro-generated symbols inside this file.
+ */
 
 /* clang-format off */
 int modem_dynamic_cmd_send(
@@ -799,8 +722,8 @@ int modem_dynamic_cmd_send(
 		.name = "dynamic_script",
 		.script_chats = &dynamic_script,
 		.script_chats_size = 1,
-		.abort_matches = abort_matches,
-		.abort_matches_size = ARRAY_SIZE(abort_matches),
+		.abort_matches = hl78xx_get_abort_matches(),
+		.abort_matches_size = hl78xx_get_abort_matches_size(),
 		.callback = script_user_callback,
 		.timeout = 1000
 	};
@@ -1043,7 +966,8 @@ static void hl78xx_run_init_script_event_handler(struct hl78xx_data *data, enum 
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_BUS_OPENED:
 		modem_chat_attach(&data->chat, data->uart_pipe);
-		modem_chat_run_script_async(&data->chat, config->init_chat_script);
+		/* Run init script via chat TU wrapper (script symbols live in hl78xx_chat.c) */
+		hl78xx_run_init_script_async(data);
 		break;
 
 	case MODEM_HL78XX_EVENT_SCRIPT_SUCCESS:
@@ -1067,22 +991,11 @@ static void hl78xx_run_init_script_event_handler(struct hl78xx_data *data, enum 
 	}
 }
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(init_fail_script_cmds,
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSREP?", ksrep_match));
-
-MODEM_CHAT_SCRIPT_DEFINE(init_fail_script, init_fail_script_cmds, abort_matches,
-			 hl78xx_chat_callback_handler, 10);
-
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_enable_ksup_urc_cmds,
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSREP=1", ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSREP?", ksrep_match));
-
-MODEM_CHAT_SCRIPT_DEFINE(hl78xx_enable_ksup_urc_script, hl78xx_enable_ksup_urc_cmds, abort_matches,
-			 hl78xx_chat_callback_handler, 4);
+/* scripts moved to hl78xx_chat.c */
 
 static int hl78xx_on_run_init_diagnose_script_state_enter(struct hl78xx_data *data)
 {
-	modem_chat_run_script_async(&data->chat, &init_fail_script);
+	hl78xx_run_init_fail_script_async(data);
 	return 0;
 }
 static void hl78xx_run_init_fail_script_event_handler(struct hl78xx_data *data,
@@ -1093,7 +1006,7 @@ static void hl78xx_run_init_fail_script_event_handler(struct hl78xx_data *data,
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_SCRIPT_SUCCESS:
 		if (data->status.ksrep == 0) {
-			modem_chat_run_script_async(&data->chat, &hl78xx_enable_ksup_urc_script);
+			hl78xx_run_enable_ksup_urc_script_async(data);
 			hl78xx_start_timer(data, K_MSEC(config->shutdown_time_ms));
 		} else {
 			if (hl78xx_gpio_is_enabled(&config->mdm_gpio_reset)) {
@@ -1160,7 +1073,7 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 	     data->kselacq_data.rat3 == 0)) {
 		char cmd_kselq[] = "AT+KSELACQ=0," CONFIG_MODEM_HL78XX_AUTORAT_PRL_PROFILES;
 		/* Re-congfiguring PRL context definition */
-		ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq, strlen(cmd_kselq), &ok_match, 1,
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq, strlen(cmd_kselq), hl78xx_get_ok_match(), 1,
 					     false);
 		if (ret < 0) {
 			goto error;
@@ -1176,14 +1089,14 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 	    data->kselacq_data.rat3 != 0) {
 		/* Re-congfiguring PRL context definition */
 		ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq_disable,
-					     strlen(cmd_kselq_disable), &ok_match, 1, false);
+						 strlen(cmd_kselq_disable), hl78xx_get_ok_match(), 1, false);
 		if (ret < 0) {
 			goto error;
 		}
 	}
 	/* Re-congfiguring PRL context definition */
 	ret = modem_dynamic_cmd_send(data, NULL, cmd_ksrat_query, strlen(cmd_ksrat_query),
-				     &ksrat_match, 1, false);
+					 hl78xx_get_ksrat_match(), 1, false);
 	if (ret < 0) {
 		goto error;
 	}
@@ -1222,7 +1135,7 @@ static int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 
 	if (*rat_request != data->status.registration.rat_mode) {
 		ret = modem_dynamic_cmd_send(data, NULL, cmd_set_rat, strlen(cmd_set_rat),
-					     &ok_match, 1, false);
+						 hl78xx_get_ok_match(), 1, false);
 		if (ret < 0) {
 			goto error;
 		} else {
@@ -1271,7 +1184,7 @@ static int hl78xx_band_cfg(struct hl78xx_data *data, bool *modem_require_restart
 			snprintf(cmd_bnd, sizeof(cmd_bnd), "AT+KBNDCFG=%d,%s", rat,
 				 bnd_bitmap); /*  RAT=0 for CAT-M1 */
 			ret = modem_dynamic_cmd_send(data, NULL, cmd_bnd, strlen(cmd_bnd),
-						     &ok_match, 1, false);
+							 hl78xx_get_ok_match(), 1, false);
 			if (ret < 0) {
 				goto error;
 			} else {
@@ -1308,8 +1221,8 @@ static int hl78xx_on_rat_cfg_script_state_enter(struct hl78xx_data *data)
 	}
 
 	if (modem_require_restart) {
-		ret = modem_dynamic_cmd_send(data, NULL, cmd_restart, strlen(cmd_restart),
-					     &ok_match, 1, false);
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_restart, strlen(cmd_restart),
+			 hl78xx_get_ok_match(), 1, false);
 		if (ret < 0) {
 			goto error;
 		}
@@ -1325,13 +1238,7 @@ error:
 	return ret;
 }
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_post_restart_chat_script_cmds,
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", at_ready_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP(KSRAT_QUERY, ksrat_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", ok_match));
-
-MODEM_CHAT_SCRIPT_DEFINE(hl78xx_post_restart_chat_script, hl78xx_post_restart_chat_script_cmds,
-			 abort_matches, hl78xx_chat_callback_handler, 1000);
+/* post-restart script moved to hl78xx_chat.c */
 
 static void hl78xx_run_rat_cfg_script_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
@@ -1340,7 +1247,7 @@ static void hl78xx_run_rat_cfg_script_event_handler(struct hl78xx_data *data, en
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_TIMEOUT:
 		LOG_DBG("Rebooting modem to apply new RAT settings");
-		ret = modem_chat_run_script_async(&data->chat, &hl78xx_post_restart_chat_script);
+	ret = hl78xx_run_post_restart_script_async(data);
 		if (ret < 0) {
 			hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_SUSPEND);
 		}
@@ -1403,14 +1310,14 @@ static int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, ui
 	snprintk(cmd_string, cmd_max_len, "AT+CGDCONT=1,\"%s\",\"%s\"", MODEM_HL78XX_ADDRESS_FAMILY,
 		 apn);
 
-	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string), &ok_match, 1,
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string), hl78xx_get_ok_match(), 1,
 				     false);
 	if (ret < 0) {
 		goto error;
 	}
 	snprintk(cmd_string, cmd_max_len,
 		 "AT+KCNXCFG=1,\"GPRS\",\"%s\",,,\"" MODEM_HL78XX_ADDRESS_FAMILY "\"", apn);
-	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string), &ok_match, 1,
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string), hl78xx_get_ok_match(), 1,
 				     false);
 	if (ret < 0) {
 		goto error;
@@ -1632,12 +1539,7 @@ static int hl78xx_on_carrier_off_state_leave(struct hl78xx_data *data)
 	return 0;
 }
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_pwroff_cmds,
-			      MODEM_CHAT_SCRIPT_CMD_RESP(SET_SIM_PWR_OFF_MODE_CMD, ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP(MDM_POWER_OFF_CMD_LEGACY, ok_match));
-
-MODEM_CHAT_SCRIPT_DEFINE(hl78xx_pwroff_script, hl78xx_pwroff_cmds, abort_matches,
-			 hl78xx_chat_callback_handler, 4);
+/* pwroff script moved to hl78xx_chat.c */
 
 static int hl78xx_on_init_power_off_state_enter(struct hl78xx_data *data)
 {
@@ -1648,7 +1550,7 @@ static int hl78xx_on_init_power_off_state_enter(struct hl78xx_data *data)
 	 * IMSI detach before powering down IS recommended by the AT command manual
 	 *
 	 */
-	return modem_chat_run_script_async(&data->chat, &hl78xx_pwroff_script);
+	return hl78xx_run_pwroff_script_async(data);
 }
 
 static void hl78xx_init_power_off_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
@@ -2150,10 +2052,10 @@ static DEVICE_API(cellular, hl78xx_api) = {
 
 #define MODEM_DEVICE_SWIR_HL78XX(inst)                                                             \
 	MODEM_HL78XX_DEFINE_INSTANCE(inst, CONFIG_MODEM_HL78XX_DEV_POWER_PULSE_DURATION,           \
-				     CONFIG_MODEM_HL78XX_DEV_RESET_PULSE_DURATION,                 \
-				     CONFIG_MODEM_HL78XX_DEV_STARTUP_TIME,                         \
-				     CONFIG_MODEM_HL78XX_DEV_SHUTDOWN_TIME, false,                 \
-				     &hl78xx_init_chat_script, &hl78xx_periodic_chat_script)
+					 CONFIG_MODEM_HL78XX_DEV_RESET_PULSE_DURATION,                 \
+					 CONFIG_MODEM_HL78XX_DEV_STARTUP_TIME,                         \
+					 CONFIG_MODEM_HL78XX_DEV_SHUTDOWN_TIME, false,                 \
+					 NULL, NULL)
 
 #define DT_DRV_COMPAT swir_hl7812
 DT_INST_FOREACH_STATUS_OKAY(MODEM_DEVICE_SWIR_HL78XX)

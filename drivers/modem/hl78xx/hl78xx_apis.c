@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "hl78xx.h"
+#include "hl78xx_chat.h"
 
 LOG_MODULE_REGISTER(hl78xx_apis, CONFIG_MODEM_LOG_LEVEL);
 
@@ -46,10 +47,6 @@ static void hl78xx_on_ok(struct modem_chat *chat, char **argv, uint16_t argc, vo
 	HL78XX_LOG_DBG("%d %s %s", __LINE__, __func__, argv[0]);
 }
 
-MODEM_CHAT_MATCH_DEFINE(ok_match, "OK", "", hl78xx_on_ok);
-MODEM_CHAT_MATCHES_DEFINE(allow_match, MODEM_CHAT_MATCH("OK", "", hl78xx_on_ok),
-			  MODEM_CHAT_MATCH("+CME ERROR: ", "", hl78xx_on_cmerror));
-
 int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_signal_type type,
 			       int16_t *value)
 {
@@ -69,12 +66,12 @@ int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_sig
 	/* Run chat script */
 	switch (type) {
 	case CELLULAR_SIGNAL_RSSI:
-		ret = hl78xx_send_cmd(data, signal_cmd_csq, NULL, allow_match, 2);
+		ret = hl78xx_send_cmd(data, signal_cmd_csq, NULL, hl78xx_get_allow_match(), hl78xx_get_allow_match_size());
 		break;
 
 	case CELLULAR_SIGNAL_RSRP:
 	case CELLULAR_SIGNAL_RSRQ:
-		ret = hl78xx_send_cmd(data, signal_cmd_cesq, NULL, allow_match, 2);
+		ret = hl78xx_send_cmd(data, signal_cmd_cesq, NULL, hl78xx_get_allow_match(), hl78xx_get_allow_match_size());
 		break;
 
 	default:
@@ -183,7 +180,7 @@ int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
 
 	case HL78XX_MODEM_INFO_NETWORK_OPERATOR:
 		/* Network operator not currently tracked; return empty or implement tracking */
-		ret = hl78xx_send_cmd(data, network_operator, NULL, allow_match, 2);
+		ret = hl78xx_send_cmd(data, network_operator, NULL, hl78xx_get_allow_match(), hl78xx_get_allow_match_size());
 		if (ret < 0) {
 			LOG_ERR("Failed to get network operator");
 		}
@@ -278,7 +275,7 @@ int hl78xx_api_func_set_phone_functionality(const struct device *dev,
 	struct hl78xx_data *data = (struct hl78xx_data *)dev->data;
 	/* configure modem fully fuctinal without restart  */
 	snprintf(cmd_string, sizeof(cmd_string), "AT+CFUN=%d,%d", functionality, reset);
-	return hl78xx_send_cmd(data, cmd_string, NULL, &ok_match, 1);
+	return hl78xx_send_cmd(data, cmd_string, NULL, hl78xx_get_ok_match(), 1);
 }
 
 int hl78xx_api_func_get_phone_functionality(const struct device *dev,
@@ -287,7 +284,7 @@ int hl78xx_api_func_get_phone_functionality(const struct device *dev,
 	const char *cmd_string = GET_FULLFUNCTIONAL_MODE_CMD;
 	struct hl78xx_data *data = (struct hl78xx_data *)dev->data;
 	/* configure modem fully fuctinal without restart  */
-	return hl78xx_send_cmd(data, cmd_string, NULL, &ok_match, 1);
+	return hl78xx_send_cmd(data, cmd_string, NULL, hl78xx_get_ok_match(), 1);
 }
 
 int hl78xx_api_func_modem_dynamic_cmd_send(const struct device *dev, const char *cmd,

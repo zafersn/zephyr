@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include "hl78xx.h"
+#include "hl78xx_chat.h"
 
 LOG_MODULE_REGISTER(hl78xx_socket, CONFIG_MODEM_LOG_LEVEL);
 
@@ -630,10 +631,10 @@ static void hl78xx_on_cme_error(struct modem_chat *chat, char **argv, uint16_t a
 }
 
 /* Define modem chat matches and scripts */
-MODEM_CHAT_MATCH_DEFINE(ok_match, "OK", "", NULL);
+MODEM_CHAT_MATCH_DEFINE(sockets_ok_match, "OK", "", NULL);
 MODEM_CHAT_MATCHES_DEFINE(connect_matches, MODEM_CHAT_MATCH(CONNECT_STRING, "", NULL),
 			  MODEM_CHAT_MATCH(CME_ERROR_STRING, "", hl78xx_on_cme_error));
-MODEM_CHAT_MATCHES_DEFINE(allow_matches, MODEM_CHAT_MATCH("OK", "", NULL),
+MODEM_CHAT_MATCHES_DEFINE(sockets_allow_matches, MODEM_CHAT_MATCH("OK", "", NULL),
 			  MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
 MODEM_CHAT_MATCH_DEFINE(kudpind_match, "+KUDP_IND: ", ",", hl78xx_on_kudpind);
 MODEM_CHAT_MATCH_DEFINE(ktcpind_match, "+KTCP_IND: ", ",", hl78xx_on_ktcpind);
@@ -1202,7 +1203,7 @@ static int socket_close(struct hl78xx_socket_data *socket_data_lcl, struct modem
 		snprintk(buf, sizeof(buf), "AT+KTCPCLOSE=%d", sock->id);
 	}
 	ret = modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, buf, strlen(buf),
-				     allow_matches, 2, false);
+					 sockets_allow_matches, 2, false);
 	if (ret < 0) {
 		LOG_ERR("%s ret:%d", buf, ret);
 	}
@@ -1224,7 +1225,7 @@ static int socket_delete(struct hl78xx_socket_data *socket_data_lcl, struct mode
 	}
 	snprintk(buf, sizeof(buf), "AT+KTCPDEL=%d", sock->id);
 	ret = modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, buf, strlen(buf),
-				     allow_matches, 2, false);
+					 sockets_allow_matches, 2, false);
 	if (ret < 0) {
 		LOG_ERR("%s ret:%d", buf, ret);
 	}
@@ -1697,7 +1698,7 @@ static ssize_t send_socket_data(void *obj, const struct sockaddr *dst_addr, cons
 	}
 	modem_chat_attach(&socket_data_lcl->mdata_global->chat,
 			  socket_data_lcl->mdata_global->uart_pipe);
-	ret = modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, "", 0, &ok_match, 1,
+	ret = modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, "", 0, &sockets_ok_match, 1,
 				     false);
 	if (ret < 0) {
 		LOG_ERR("Final confirmation failed: %d", ret);
@@ -2024,7 +2025,7 @@ static int hl78xx_configure_chipper_suit(struct hl78xx_socket_data *socket_data_
 	const char *cmd_chipper_suit = "AT+KSSLCRYPTO=0,8,1,8192,4,4,3,0";
 
 	return modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, cmd_chipper_suit,
-				      strlen(cmd_chipper_suit), &ok_match, 1, false);
+					  strlen(cmd_chipper_suit), hl78xx_get_ok_match(), 1, false);
 }
 /* send binary data via the K....STORE commands */
 static ssize_t hl78xx_send_cert(struct hl78xx_socket_data *socket_data_lcl, const char *cert_data,
@@ -2091,8 +2092,8 @@ static ssize_t hl78xx_send_cert(struct hl78xx_socket_data *socket_data_lcl, cons
 	}
 	modem_chat_attach(&socket_data_lcl->mdata_global->chat,
 			  socket_data_lcl->mdata_global->uart_pipe);
-	ret = modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, "", 0, &ok_match, 1,
-				     false);
+	ret = modem_dynamic_cmd_send(socket_data_lcl->mdata_global, NULL, "", 0, hl78xx_get_ok_match(), 1,
+					 false);
 	if (ret < 0) {
 		LOG_ERR("Final confirmation failed: %d", ret);
 		goto cleanup;
