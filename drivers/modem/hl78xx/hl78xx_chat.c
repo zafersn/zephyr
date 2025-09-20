@@ -1,8 +1,21 @@
-/* Chat script and URC match definitions - extracted from hl78xx.c */
+/******************************************************************************
+ * hl78xx_chat.c
+ *
+ * Centralized translation unit for MODEM_CHAT_* macro-generated objects and
+ * chat scripts for the HL78xx driver. This file contains the MODEM_CHAT
+ * matches and script definitions and exposes runtime wrapper functions
+ * declared in hl78xx_chat.h.
+ *
+ * Contract:
+ *  - Other translation units MUST NOT take addresses of the MODEM_CHAT_*
+ *    symbols or use ARRAY_SIZE() on them at file scope. Use the getters
+ *    (hl78xx_get_*) and runners (hl78xx_run_*_script[_async]) instead.
+ ******************************************************************************/
+
 #include "hl78xx.h"
+#include "hl78xx_chat.h"
 #include <zephyr/modem/chat.h>
 #include <zephyr/logging/log.h>
-#include "hl78xx_chat.h"
 
 LOG_MODULE_DECLARE(hl78xx_dev);
 

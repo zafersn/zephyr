@@ -31,22 +31,6 @@ static int hl78xx_send_cmd(struct hl78xx_data *data, const char *cmd,
 				      match_count, true);
 }
 
-static void hl78xx_on_cmerror(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
-{
-	if (argc < 2) {
-		return;
-	}
-	HL78XX_LOG_DBG("%d %s %s", __LINE__, __func__, argv[0]);
-}
-
-static void hl78xx_on_ok(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
-{
-	if (argc < 2) {
-		return;
-	}
-	HL78XX_LOG_DBG("%d %s %s", __LINE__, __func__, argv[0]);
-}
-
 int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_signal_type type,
 			       int16_t *value)
 {
@@ -151,6 +135,7 @@ int hl78xx_api_func_get_registration_status(const struct device *dev,
 	k_mutex_unlock(&data->api_lock);
 	return 0;
 }
+
 int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
 					  enum hl78xx_modem_info_type type, void *info, size_t size)
 {

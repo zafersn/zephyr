@@ -1,6 +1,10 @@
 /*
- * Chat script and URC match definitions for the HL78xx driver.
- * Extracted from hl78xx.c to reduce file size and separate AT/chat logic.
+ * hl78xx_chat.h
+ *
+ * Wrapper accessors for MODEM_CHAT_* objects that live in a dedicated
+ * translation unit (hl78xx_chat.c). Other driver TUs should only call
+ * these functions instead of taking addresses or using sizeof/ARRAY_SIZE
+ * on the macro-generated objects.
  */
 #ifndef ZEPHYR_DRIVERS_MODEM_HL78XX_HL78XX_CHAT_H_
 #define ZEPHYR_DRIVERS_MODEM_HL78XX_HL78XX_CHAT_H_
@@ -14,7 +18,7 @@
  */
 struct hl78xx_data;
 
-/* Callback used by modem_chat when a script completes. */
+/* Chat callback bridge used by driver TUs to receive script results. */
 void hl78xx_chat_callback_handler(struct modem_chat *chat,
                                   enum modem_chat_script_result result,
                                   void *user_data);
