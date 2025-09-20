@@ -133,27 +133,47 @@ struct hl78xx_socket_data {
 	struct hl78xx_tls_info tls;
 	struct hl78xx_tcp_status tcp_conn_status;
 	struct hl78xx_udp_status udp_conn_status;
+	/* per-socket parser state (migrated from globals) - keep only parser_* fields
+	 * to avoid duplicated storage and shrink per-socket footprint.
+	 */
+	bool parser_match_connect_found;
+	bool parser_match_eof_ok_found;
+	bool parser_match_found;
+	uint16_t parser_start_index_eof;
+	uint16_t parser_size_of_socketdata;
+	bool parser_socket_data_received;
 };
-/* work buffer for socket data */
-struct work_socket_data {
-	char buf[HL78XX_UART_PIPE_WORK_SOCKET_BUFFER_SIZE];
-	uint16_t len;
-};
-/* work buffer for socket data */
-struct work_socket_data work_buf;
-/* socket data matching flags */
-bool match_connect_found;
-bool match_eof_ok_found;
-bool match_found;
-bool socket_data_received;
-uint16_t start_index_eof;
-uint16_t size_of_socketdata;
-atomic_t state_leftover;
+/* Group socket-related globals into a single struct to improve locality
+ * and reduce global bss fragmentation. The existing symbol names are
+ * preserved via macros to avoid touching the rest of the file.
+ */
+/* NOTE:
+ * The TU-level socket globals were removed in favour of per-instance
+ * storage. `work_buf` is allocated on the stack in the handler that
+ * needs it. `state_leftover` moved into `struct hl78xx_data` so the
+ * modem instance owns its leftover state. Per-socket parser fields
+ * remain in `struct hl78xx_socket_data`.
+ */
+
 /**
  * have to keep this global pointer only for
  * static int offload_socket(int family, int type, int proto)
  */
 static struct hl78xx_socket_data *socket_data_global;
+
+/* Accessors for the global socket data pointer. Keep the underlying
+ * storage static but avoid other functions directly dereferencing the
+ * symbol; use these helpers to make future refactors safer.
+ */
+static inline void hl78xx_set_socket_global(struct hl78xx_socket_data *d)
+{
+	socket_data_global = d;
+}
+
+static inline struct hl78xx_socket_data *hl78xx_get_socket_global(void)
+{
+	return socket_data_global;
+}
 
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS) && defined(CONFIG_MODEM_HL78XX_SOCKETS_SOCKOPT_TLS)
 static int map_credentials(struct hl78xx_socket_data *socket_data_lcl, const void *optval,
@@ -645,14 +665,17 @@ MODEM_CHAT_MATCH_DEFINE(ktcp_state_match, "+KTCPSTAT: ", ",", hl78xx_on_ktcpstat
 static void parser_reset(struct hl78xx_socket_data *socket_data_lcl)
 {
 	memset(&socket_data_lcl->receive_buf, 0, sizeof(socket_data_lcl->receive_buf));
-	match_found = false;
+	socket_data_lcl->parser_match_found = false;
 }
 
-static void found_reset(void)
+static void found_reset(struct hl78xx_socket_data *socket_data_lcl)
 {
-	match_connect_found = false;
-	match_eof_ok_found = false;
-	socket_data_received = false;
+	if (!socket_data_lcl) {
+		return;
+	}
+	socket_data_lcl->parser_match_connect_found = false;
+	socket_data_lcl->parser_match_eof_ok_found = false;
+	socket_data_lcl->parser_socket_data_received = false;
 }
 
 static bool modem_chat_parse_end_del_start(struct hl78xx_socket_data *socket_data_lcl,
@@ -708,7 +731,7 @@ static bool is_receive_buffer_full(struct hl78xx_socket_data *socket_data_lcl)
 static void handle_expected_length_decrement(struct hl78xx_socket_data *socket_data_lcl)
 {
 	/* Decrement expected length if CONNECT matched and expected length > 0 */
-	if (match_connect_found && socket_data_lcl->expected_buf_len > 0) {
+	if (socket_data_lcl->parser_match_connect_found && socket_data_lcl->expected_buf_len > 0) {
 		socket_data_lcl->expected_buf_len--;
 	}
 }
@@ -721,8 +744,8 @@ static bool is_end_delimiter_only(struct hl78xx_socket_data *socket_data_lcl)
 
 static bool is_valid_eof_index(struct hl78xx_socket_data *socket_data_lcl, uint8_t size_match)
 {
-	start_index_eof = socket_data_lcl->receive_buf.len - size_match - 2;
-	return start_index_eof < ARRAY_SIZE(socket_data_lcl->receive_buf.buf);
+	socket_data_lcl->parser_start_index_eof = socket_data_lcl->receive_buf.len - size_match - 2;
+	return socket_data_lcl->parser_start_index_eof < ARRAY_SIZE(socket_data_lcl->receive_buf.buf);
 }
 
 static void try_handle_eof_pattern(struct hl78xx_socket_data *socket_data_lcl)
@@ -735,15 +758,15 @@ static void try_handle_eof_pattern(struct hl78xx_socket_data *socket_data_lcl)
 	if (!is_valid_eof_index(socket_data_lcl, size_match)) {
 		return;
 	}
-	if (strncmp(&socket_data_lcl->receive_buf.buf[start_index_eof], EOF_PATTERN, size_match) ==
-	    0) {
+	if (strncmp(&socket_data_lcl->receive_buf.buf[socket_data_lcl->parser_start_index_eof],
+				EOF_PATTERN, size_match) == 0) {
 		int ret = ring_buf_put(socket_data_lcl->buf_pool, socket_data_lcl->receive_buf.buf,
-				       start_index_eof);
+					   socket_data_lcl->parser_start_index_eof);
 
 		if (ret <= 0) {
 			LOG_ERR("ring_buf_put failed: %d", ret);
 		}
-		socket_data_received = true;
+	socket_data_lcl->parser_socket_data_received = true;
 		socket_data_lcl->collected_buf_len += ret;
 	}
 }
@@ -787,8 +810,8 @@ static void socket_process_bytes(struct hl78xx_socket_data *socket_data_lcl, cha
 			parser_reset(socket_data_lcl);
 			return;
 		}
-		size_of_socketdata = socket_data_lcl->receive_buf.len;
-		if (match_connect_found && !match_eof_ok_found) {
+		socket_data_lcl->parser_size_of_socketdata = socket_data_lcl->receive_buf.len;
+		if (socket_data_lcl->parser_match_connect_found && !socket_data_lcl->parser_match_eof_ok_found) {
 			try_handle_eof_pattern(socket_data_lcl);
 		}
 		parser_reset(socket_data_lcl);
@@ -797,14 +820,14 @@ static void socket_process_bytes(struct hl78xx_socket_data *socket_data_lcl, cha
 	if (modem_chat_parse_end_del_start(socket_data_lcl, &socket_data_lcl->mdata_global->chat)) {
 		return;
 	}
-	if (!match_found && !match_connect_found) {
+	if (!socket_data_lcl->parser_match_found && !socket_data_lcl->parser_match_connect_found) {
 		if (is_connect_match(socket_data_lcl)) {
-			match_connect_found = true;
+			socket_data_lcl->parser_match_connect_found = true;
 			LOG_DBG("CONNECT matched. Expecting %d more bytes.",
 				socket_data_lcl->expected_buf_len);
 			return;
 		} else if (is_cme_error_match(socket_data_lcl)) {
-			match_found = true; /* mark this to prevent further parsing */
+			socket_data_lcl->parser_match_found = true; /* mark this to prevent further parsing */
 			LOG_ERR("CME ERROR received. Connection failed.");
 			socket_data_lcl->expected_buf_len = 0;
 			socket_data_lcl->collected_buf_len = 0;
@@ -815,8 +838,9 @@ static void socket_process_bytes(struct hl78xx_socket_data *socket_data_lcl, cha
 			return;
 		}
 	}
-	if (match_connect_found && !match_eof_ok_found && is_ok_match(socket_data_lcl)) {
-		match_eof_ok_found = true;
+	if (socket_data_lcl->parser_match_connect_found && !socket_data_lcl->parser_match_eof_ok_found &&
+		is_ok_match(socket_data_lcl)) {
+		socket_data_lcl->parser_match_eof_ok_found = true;
 		LOG_DBG("OK matched.");
 	}
 }
@@ -829,26 +853,30 @@ static int modem_process_handler(struct hl78xx_data *data)
 	/* If no more data is expected, set leftover state and return */
 	if (socket_data_lcl->expected_buf_len == 0) {
 		LOG_DBG("No more data expected");
-		atomic_set_bit(&state_leftover, MODEM_SOCKET_DATA_LEFTOVER_STATE_BIT);
+		atomic_set_bit(&socket_data_lcl->mdata_global->state_leftover,
+					   MODEM_SOCKET_DATA_LEFTOVER_STATE_BIT);
 		return 0;
 	}
-	recv_len = modem_pipe_receive(socket_data_lcl->mdata_global->uart_pipe, work_buf.buf,
-				      MIN(sizeof(work_buf.buf), socket_data_lcl->expected_buf_len));
+
+	/* Use a small stack buffer for the pipe read to avoid TU-global BSS */
+	char work_buf_local[HL78XX_UART_PIPE_WORK_SOCKET_BUFFER_SIZE];
+	int work_len = MIN(sizeof(work_buf_local), socket_data_lcl->expected_buf_len);
+	recv_len = modem_pipe_receive(socket_data_lcl->mdata_global->uart_pipe, work_buf_local,
+					  work_len);
 	if (recv_len <= 0) {
 		LOG_WRN("modem_pipe_receive returned %d", recv_len);
 		return recv_len;
 	}
-	work_buf.len = recv_len;
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
-	LOG_HEXDUMP_DBG(work_buf.buf, recv_len, "Received bytes:");
+	LOG_HEXDUMP_DBG(work_buf_local, recv_len, "Received bytes:");
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
 	for (int i = 0; i < recv_len; i++) {
-		socket_process_bytes(socket_data_lcl, work_buf.buf[i]);
+	socket_process_bytes(socket_data_lcl, work_buf_local[i]);
 	}
-	if (match_eof_ok_found && socket_data_received) {
-		LOG_DBG("All data received: %d bytes", size_of_socketdata);
+	if (socket_data_lcl->parser_match_eof_ok_found && socket_data_lcl->parser_socket_data_received) {
+		LOG_DBG("All data received: %d bytes", socket_data_lcl->parser_size_of_socketdata);
 		socket_data_lcl->expected_buf_len = 0;
-		found_reset();
+		found_reset(socket_data_lcl);
 		k_sem_give(&socket_data_lcl->mdata_global->script_stopped_sem_rx_int);
 	}
 	return 0;
@@ -874,6 +902,19 @@ static void modem_pipe_callback(struct modem_pipe *pipe, enum modem_pipe_event e
 		break;
 	}
 }
+
+/* Expose test wrapper when running ztest harnesses */
+#if defined(CONFIG_ZTEST)
+/**
+ * Test hook: expose a non-static wrapper so unit tests can invoke the
+ * internal `modem_process_handler` without changing the static linkage
+ * of the production symbol.
+ */
+int hl78xx_parser_test_invoke(struct hl78xx_data *data)
+{
+	return modem_process_handler(data);
+}
+#endif
 
 void notif_carrier_off(const struct device *dev)
 {
@@ -1241,8 +1282,15 @@ static int offload_socket(int family, int type, int proto)
 	int ret;
 
 	HL78XX_LOG_DBG("%d %d %d %d", __LINE__, family, type, proto);
-	/* defer modem's socket create call to bind() */
-	ret = modem_socket_get(&socket_data_global->socket_config, family, type, proto);
+	/* defer modem's socket create call to bind(); use accessor and check */
+	struct hl78xx_socket_data *g = hl78xx_get_socket_global();
+	if (!g) {
+		LOG_ERR("Socket global not initialized");
+		errno = -ENODEV;
+		return -1;
+	}
+
+	ret = modem_socket_get(&g->socket_config, family, type, proto);
 	if (ret < 0) {
 		errno = ret;
 		return -1;
@@ -1466,7 +1514,8 @@ static void restore_socket_state(struct hl78xx_socket_data *socket_data_lcl)
 static void check_tcp_state_if_needed(struct hl78xx_socket_data *socket_data_lcl,
 				      struct modem_socket *sock)
 {
-	if (atomic_test_and_clear_bit(&state_leftover, MODEM_SOCKET_DATA_LEFTOVER_STATE_BIT) &&
+	if (atomic_test_and_clear_bit(&socket_data_lcl->mdata_global->state_leftover,
+								  MODEM_SOCKET_DATA_LEFTOVER_STATE_BIT) &&
 	    sock->ip_proto == IPPROTO_TCP) {
 		const char *check_ktcp_stat = "AT+KTCPSTAT";
 
@@ -2181,11 +2230,9 @@ static int hl78xx_socket_init(const struct device *dev)
 	}
 	data->mdata_global = (struct hl78xx_data *)data->modem_dev->data;
 	data->mdata_global->offload_dev = dev;
-	/* Note: a single global pointer is used in the original driver; keep
-	 * that behaviour.
-	 */
-	socket_data_global = data;
-	atomic_set(&state_leftover, 0);
+	/* Keep original single global pointer usage but set via accessor. */
+	hl78xx_set_socket_global(data);
+	atomic_set(&data->mdata_global->state_leftover, 0);
 
 	return 0;
 }

@@ -305,6 +305,12 @@ struct hl78xx_data {
 
 	struct k_work_delayable timeout_work;
 
+	/* Track leftover socket data state previously stored as a TU-global.
+	 * Moving this into the per-modem data reduces global BSS and keeps
+	 * state colocated with the modem instance.
+	 */
+	atomic_t state_leftover;
+
 #if defined(CONFIG_MODEM_HL78XX_RSSI_WORK)
 	struct k_work_delayable rssi_query_work;
 #endif
