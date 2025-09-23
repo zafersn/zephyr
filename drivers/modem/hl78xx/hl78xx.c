@@ -27,23 +27,6 @@
 
 #define MAX_SCRIPT_AT_CMD_RETRY 3
 
-/* ==========================================================================
- * HL78XX modem driver — Phase 0 grouping and outline
- *
- * This file is large. Phase 0 only adds lightweight section headers and a
- * compact outline to improve navigation and readability. No functional code
- * changes are made in this patch.
- *
- * File sections (in this source):
- *  - Utilities (string helpers, small helpers)
- *  - Chat callbacks / URC handlers
- *  - Chat scripts / matches
- *  - Modem pipe & chat init
- *  - GPIO callbacks
- *  - State machine handlers (enter/leave/event handlers)
- *  - PM and device init
- * ========================================================================= */
-
 #define MDM_NODE DT_ALIAS(modem)
 
 /* GPIO availability macros */
@@ -59,7 +42,6 @@
 	 HAS_GPIO6_GPIO + HAS_UART_DSR_GPIO)
 
 LOG_MODULE_REGISTER(hl78xx_dev, CONFIG_MODEM_LOG_LEVEL);
-
 /* RX thread work queue */
 K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_HL78XX_RX_WORKQ_STACK_SIZE);
 
@@ -68,13 +50,7 @@ hl78xx_evt_monitor_dispatcher_t event_dispatcher;
 
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt);
 static int hl78xx_on_idle_state_enter(struct hl78xx_data *data);
-/* Forward declaration for the state handler table (defined later). This
- * allows functions declared above to reference the table.
- */
 
-/* State handler structure: forward-declare the type so the table can be
- * referenced by functions defined earlier in the file.
- */
 struct hl78xx_state_handlers {
 	int (*on_enter)(struct hl78xx_data *data);
 	int (*on_leave)(struct hl78xx_data *data);
@@ -82,20 +58,16 @@ struct hl78xx_state_handlers {
 };
 
 /* Forward declare the table so functions earlier in this file can reference
-
-	case MODEM_HL78XX_EVENT_SCRIPT_FAILED:
-		hl78xx_enter_state(data, MODEM_HL78XX_STATE_RUN_INIT_FAIL_DIAGNOSTIC_SCRIPT);
  * it. The table itself is defined later in the file (without 'static').
  */
-extern const struct hl78xx_state_handlers hl78xx_state_table[];
-
+const static struct hl78xx_state_handlers hl78xx_state_table[];
+/** Dispatch an event to the registered event dispatcher, if any. */
 static void event_dispatcher_dispatch(struct hl78xx_evt *notif)
 {
 	if (event_dispatcher != NULL) {
 		event_dispatcher(notif);
 	}
 }
-
 /* -------------------------------------------------------------------------
  * Utilities
  * - small helpers and local utility functions
@@ -192,22 +164,6 @@ static void hl78xx_start_timer(struct hl78xx_data *data, k_timeout_t timeout)
 	k_work_schedule(&data->timeout_work, timeout);
 }
 
-/* Small utility: safe strncpy that always NUL-terminates the destination. */
-static void safe_strncpy_local(char *dst, const char *src, size_t dst_size)
-{
-	if (dst == NULL || dst_size == 0) {
-		return;
-	}
-
-	if (src == NULL) {
-		dst[0] = '\0';
-		return;
-	}
-
-	strncpy(dst, src, dst_size - 1);
-	dst[dst_size - 1] = '\0';
-}
-
 static void hl78xx_stop_timer(struct hl78xx_data *data)
 {
 	k_work_cancel_delayable(&data->timeout_work);
@@ -249,16 +205,14 @@ static void hl78xx_event_dispatch_handler(struct k_work *item)
 {
 	struct hl78xx_data *data =
 		CONTAINER_OF(item, struct hl78xx_data, events.event_dispatch_work);
-
 	uint8_t events[sizeof(data->events.event_buf)];
 	uint8_t events_cnt;
 
 	k_mutex_lock(&data->events.event_rb_lock, K_FOREVER);
-
 	events_cnt = (uint8_t)ring_buf_get(&data->events.event_rb, events,
 					   sizeof(data->events.event_buf));
-
 	k_mutex_unlock(&data->events.event_rb_lock);
+	LOG_DBG("event_dispatch_handler: dequeued %d events", events_cnt);
 
 	for (uint8_t i = 0; i < events_cnt; i++) {
 		hl78xx_event_handler(data, (enum hl78xx_event)events[i]);
@@ -270,14 +224,13 @@ void hl78xx_delegate_event(struct hl78xx_data *data, enum hl78xx_event evt)
 	k_mutex_lock(&data->events.event_rb_lock, K_FOREVER);
 	ring_buf_put(&data->events.event_rb, (uint8_t *)&evt, 1);
 	k_mutex_unlock(&data->events.event_rb_lock);
+	LOG_DBG("hl78xx_delegate_event: queued event %d", evt);
 	k_work_submit_to_queue(&modem_workq, &data->events.event_dispatch_work);
 }
-
 /* -------------------------------------------------------------------------
  * Chat callbacks / URC handlers
  * - unsolicited response handlers and chat-related parsers
  * ------------------------------------------------------------------------- */
-
 void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
@@ -348,7 +301,7 @@ void hl78xx_on_imei(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	}
 	HL78XX_LOG_DBG("IMEI: %s %s", argv[0], argv[1]);
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.imei, argv[1], sizeof(data->identity.imei));
+	safe_strncpy((char *)data->identity.imei, argv[1], sizeof(data->identity.imei));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -361,8 +314,7 @@ void hl78xx_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	}
 	HL78XX_LOG_DBG("cgmm: %s %s", argv[0], argv[1]);
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.model_id, argv[1],
-			   sizeof(data->identity.model_id));
+	safe_strncpy((char *)data->identity.model_id, argv[1], sizeof(data->identity.model_id));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -375,7 +327,7 @@ void hl78xx_on_imsi(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	}
 	HL78XX_LOG_DBG("IMSI: %s %s", argv[0], argv[1]);
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.imsi, argv[1], sizeof(data->identity.imsi));
+	safe_strncpy((char *)data->identity.imsi, argv[1], sizeof(data->identity.imsi));
 	k_mutex_unlock(&data->api_lock);
 #if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_IMSI)
 	/* set the APN automatically */
@@ -392,8 +344,8 @@ void hl78xx_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	}
 	HL78XX_LOG_DBG("cgmi: %s %s", argv[0], argv[1]);
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.manufacturer, argv[1],
-			   sizeof(data->identity.manufacturer));
+	safe_strncpy((char *)data->identity.manufacturer, argv[1],
+		     sizeof(data->identity.manufacturer));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -406,8 +358,7 @@ void hl78xx_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	}
 	HL78XX_LOG_DBG("cgmr: %s %s", argv[0], argv[1]);
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.fw_version, argv[1],
-			   sizeof(data->identity.fw_version));
+	safe_strncpy((char *)data->identity.fw_version, argv[1], sizeof(data->identity.fw_version));
 	k_mutex_unlock(&data->api_lock);
 }
 
@@ -420,7 +371,7 @@ void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc, void *
 	}
 	HL78XX_LOG_DBG("ICCID: %s %s", argv[0], argv[1]);
 	k_mutex_lock(&data->api_lock, K_FOREVER);
-	safe_strncpy_local((char *)data->identity.iccid, argv[1], sizeof(data->identity.iccid));
+	safe_strncpy((char *)data->identity.iccid, argv[1], sizeof(data->identity.iccid));
 	k_mutex_unlock(&data->api_lock);
 
 #if defined(CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID)
@@ -429,7 +380,6 @@ void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc, void *
 #endif /* CONFIG_MODEM_HL78XX_APN_SOURCE_ICCID */
 }
 
-/* Handler: +KSTATEV: */
 void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
@@ -441,7 +391,6 @@ void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void
 	}
 	rat_mode = ATOI(argv[2], 0, "rat_mode");
 #ifdef CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG
-	LOG_DBG("KSTATEV: %s %s %s", argv[0], argv[1], argv[2]);
 	hl78xx_on_kstatev_parser(data, (enum hl78xx_info_transfer_event)ATOI(argv[1], 0, "status"),
 				 rat_mode);
 #endif /* CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG */
@@ -450,49 +399,6 @@ void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void
 		event.content.rat_mode = data->status.registration.rat_mode;
 		event_dispatcher_dispatch(&event);
 	}
-}
-
-void hl78xx_on_udprcv(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
-{
-	if (argc < 2) {
-		return;
-	}
-	HL78XX_LOG_DBG("%d %d [%s] [%s] [%s]", __LINE__, argc, argv[0], argv[1], argv[2]);
-}
-
-void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
-{
-	int socket_id = -1;
-	int new_total = -1;
-
-	if (argc < 2) {
-		return;
-	}
-	socket_id = ATOI(argv[1], -1, "socket_id");
-	new_total = ATOI(argv[2], -1, "length");
-	if (socket_id < 0 || new_total < 0) {
-		return;
-	}
-	HL78XX_LOG_DBG("%d %d %d", __LINE__, socket_id, new_total);
-	socket_notify_data(socket_id, new_total, user_data);
-}
-
-/** +KTCP_NOTIF: <session_id>, <tcp_notif> */
-void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
-{
-	int socket_id = -1;
-	int tcp_notif = -1;
-
-	if (argc < 2) {
-		return;
-	}
-	socket_id = ATOI(argv[1], -1, "socket_id");
-	tcp_notif = ATOI(argv[2], -1, "tcp_notif");
-	HL78XX_LOG_DBG("%d %d %d", __LINE__, socket_id, tcp_notif);
-	if (tcp_notif == -1) {
-		return;
-	}
-	tcp_notify_data(socket_id, tcp_notif, user_data);
 }
 
 void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
@@ -616,10 +522,9 @@ void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 }
 
 /* -------------------------------------------------------------------------
- * Chat script matches / definitions
- * (moved to hl78xx_chat.c)
+ * Pipe & chat initialization
+ * - modem backend pipe setup and chat initialisation helpers
  * ------------------------------------------------------------------------- */
-
 static void hl78xx_init_pipe(const struct device *dev)
 {
 	const struct hl78xx_config *cfg = dev->config;
@@ -657,23 +562,6 @@ static int modem_init_chat(const struct device *dev)
 
 	return modem_chat_init(&data->chat, &chat_config);
 }
-
-/*
- * hl78xx_init_pipe - initialize UART backend pipe
- *
- * This wraps modem_backend_uart_init and stores the returned pipe on the
- * device data. No global side-effects other than assigning data->uart_pipe.
- */
-
-/* -------------------------------------------------------------------------
- * Pipe & chat initialization
- * - modem backend pipe setup and chat initialisation helpers
- * ------------------------------------------------------------------------- */
-
-/* Chat script matches / definitions are implemented in hl78xx_chat.c
- * and exposed via hl78xx_chat.h wrapper helpers. This avoids compile-time
- * dependence on MODEM_CHAT_* macro-generated symbols inside this file.
- */
 
 /* clang-format off */
 int modem_dynamic_cmd_send(
@@ -735,12 +623,15 @@ int modem_dynamic_cmd_send(
 }
 /* clang-format on */
 
+/* -------------------------------------------------------------------------
+ * GPIO ISR callbacks
+ * - lightweight wrappers for GPIO interrupts (logging & event dispatch)
+ * -------------------------------------------------------------------------
+ */
 void mdm_vgpio_callback_isr(const struct device *port, struct gpio_callback *cb, uint32_t pins)
 {
 	struct hl78xx_data *data = CONTAINER_OF(cb, struct hl78xx_data, gpio_cbs.vgpio_cb);
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused depending on compile-time options; silence warnings */
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 	const struct gpio_dt_spec *spec = &config->mdm_gpio_vgpio;
 
 	if (spec == NULL || spec->port == NULL) {
@@ -753,23 +644,11 @@ void mdm_vgpio_callback_isr(const struct device *port, struct gpio_callback *cb,
 	LOG_DBG("VGPIO ISR callback %s %d %d", spec->port->name, spec->pin, gpio_pin_get_dt(spec));
 }
 
-/*
- * GPIO ISR callbacks are intentionally tiny: they validate the pin, log the
- * interrupt and return quickly. Heavy lifting should be deferred to work
- * items scheduled from thread context if necessary.
- */
-
-/* -------------------------------------------------------------------------
- * GPIO ISR callbacks
- * - lightweight wrappers for GPIO interrupts (logging & event dispatch)
- * ------------------------------------------------------------------------- */
-
 #if HAS_UART_DSR_GPIO
 void mdm_uart_dsr_callback_isr(const struct device *port, struct gpio_callback *cb, uint32_t pins)
 {
 	struct hl78xx_data *data = CONTAINER_OF(cb, struct hl78xx_data, gpio_cbs.vgpio_cb);
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 	const struct gpio_dt_spec *spec = &config->mdm_gpio_uart_dsr;
 
 	if (spec == NULL || spec->port == NULL) {
@@ -787,7 +666,6 @@ void mdm_gpio6_callback_isr(const struct device *port, struct gpio_callback *cb,
 {
 	struct hl78xx_data *data = CONTAINER_OF(cb, struct hl78xx_data, gpio_cbs.gpio6_cb);
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 	const struct gpio_dt_spec *spec = &config->mdm_gpio_gpio6;
 
 	if (spec == NULL || spec->port == NULL) {
@@ -804,7 +682,6 @@ void mdm_uart_cts_callback_isr(const struct device *port, struct gpio_callback *
 {
 	struct hl78xx_data *data = CONTAINER_OF(cb, struct hl78xx_data, gpio_cbs.gpio6_cb);
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 	const struct gpio_dt_spec *spec = &config->mdm_gpio_uart_cts;
 
 	if (spec == NULL || spec->port == NULL) {
@@ -834,7 +711,6 @@ bool hl78xx_is_registered(struct hl78xx_data *data)
 static int hl78xx_on_reset_pulse_state_enter(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 
 	if (hl78xx_gpio_is_enabled(&config->mdm_gpio_wake)) {
 		gpio_pin_set_dt(&config->mdm_gpio_wake, 0);
@@ -868,7 +744,6 @@ static void hl78xx_reset_pulse_event_handler(struct hl78xx_data *data, enum hl78
 static int hl78xx_on_reset_pulse_state_leave(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 
 	if (hl78xx_gpio_is_enabled(&config->mdm_gpio_reset)) {
 		gpio_pin_set_dt(&config->mdm_gpio_reset, 0);
@@ -883,7 +758,6 @@ static int hl78xx_on_reset_pulse_state_leave(struct hl78xx_data *data)
 static int hl78xx_on_power_on_pulse_state_enter(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 
 	if (hl78xx_gpio_is_enabled(&config->mdm_gpio_pwr_on)) {
 		gpio_pin_set_dt(&config->mdm_gpio_pwr_on, 1);
@@ -911,7 +785,6 @@ static void hl78xx_power_on_pulse_event_handler(struct hl78xx_data *data, enum h
 static int hl78xx_on_power_on_pulse_state_leave(struct hl78xx_data *data)
 {
 	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* may be unused in some handlers; silence compiler warnings */
 
 	if (hl78xx_gpio_is_enabled(&config->mdm_gpio_pwr_on)) {
 		gpio_pin_set_dt(&config->mdm_gpio_pwr_on, 0);
@@ -951,9 +824,6 @@ static int hl78xx_on_run_init_script_state_enter(struct hl78xx_data *data)
 
 static void hl78xx_run_init_script_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
-	const struct hl78xx_config *config = (const struct hl78xx_config *)data->dev->config;
-	(void)config; /* config is intentionally unused in this handler; silence compiler warning */
-
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_BUS_OPENED:
 		modem_chat_attach(&data->chat, data->uart_pipe);
@@ -981,13 +851,12 @@ static void hl78xx_run_init_script_event_handler(struct hl78xx_data *data, enum 
 	}
 }
 
-/* scripts moved to hl78xx_chat.c */
-
 static int hl78xx_on_run_init_diagnose_script_state_enter(struct hl78xx_data *data)
 {
 	hl78xx_run_init_fail_script_async(data);
 	return 0;
 }
+
 static void hl78xx_run_init_fail_script_event_handler(struct hl78xx_data *data,
 						      enum hl78xx_event evt)
 {
@@ -1048,10 +917,6 @@ static void hl78xx_run_init_fail_script_event_handler(struct hl78xx_data *data,
 	}
 }
 
-/* hl78xx_rat_cfg implementation moved to hl78xx_cfg.c */
-
-/* hl78xx_band_cfg implementation moved to hl78xx_cfg.c */
-
 static int hl78xx_on_rat_cfg_script_state_enter(struct hl78xx_data *data)
 {
 	int ret = 0;
@@ -1087,8 +952,6 @@ error:
 	LOG_ERR("%d %s Failed to send command: %d", __LINE__, __func__, ret);
 	return ret;
 }
-
-/* post-restart script moved to hl78xx_chat.c */
 
 static void hl78xx_run_rat_cfg_script_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
@@ -1129,10 +992,6 @@ static void hl78xx_await_power_off_event_handler(struct hl78xx_data *data, enum 
 		hl78xx_enter_state(data, MODEM_HL78XX_STATE_IDLE);
 	}
 }
-
-/* hl78xx_set_apn_internal moved to hl78xx_cfg.c. See hl78xx_cfg.h for the
- * declaration and hl78xx_cfg.c for the implementation.
- */
 
 static int hl78xx_on_enable_gprs_state_enter(struct hl78xx_data *data)
 {
@@ -1279,6 +1138,7 @@ static void hl78xx_carrier_on_event_handler(struct hl78xx_data *data, enum hl78x
 		break;
 
 	case MODEM_HL78XX_EVENT_TIMEOUT:
+		LOG_DBG("Triggering DNS update %d", __LINE__);
 		dns_work_cb(data->dev, true);
 		break;
 
@@ -1481,13 +1341,6 @@ static int hl78xx_on_idle_state_leave(struct hl78xx_data *data)
 static int hl78xx_on_state_enter(struct hl78xx_data *data)
 {
 	int ret = 0;
-
-	HL78XX_LOG_DBG("%d %d", __LINE__, data->status.state);
-
-	/* Table-driven dispatch makes it easier to see and extend state
-	 * mappings. See `hl78xx_state_table` (type and table are declared
-	 * just above this function definition).
-	 */
 	enum hl78xx_state s = data->status.state;
 
 	/* Use an explicit bounds check against the last enum value so this
@@ -1505,8 +1358,6 @@ static int hl78xx_on_state_enter(struct hl78xx_data *data)
 static int hl78xx_on_state_leave(struct hl78xx_data *data)
 {
 	int ret = 0;
-
-	HL78XX_LOG_DBG("%d %d", __LINE__, data->status.state);
 	enum hl78xx_state s = data->status.state;
 
 	if ((int)s <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF && hl78xx_state_table[s].on_leave) {
@@ -1536,35 +1387,30 @@ void hl78xx_enter_state(struct hl78xx_data *data, enum hl78xx_state state)
 	}
 }
 
-/*
- * hl78xx_enter_state - change the modem driver's state
- *
- * This wrapper calls the current state's leave handler and the new state's
- * enter handler. The function logs warnings on errors but keeps behavior the
- * same as the previous implementation.
- */
-
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
 	enum hl78xx_state state;
-
-	state = data->status.state;
+	enum hl78xx_state s;
 
 	hl78xx_log_event(evt);
-	enum hl78xx_state s = data->status.state;
-
+	s = data->status.state;
+	state = data->status.state;
 	if ((int)s <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF && hl78xx_state_table[s].on_event) {
 		hl78xx_state_table[s].on_event(data, evt);
 	} else {
 		LOG_ERR("%d %s unknown event", __LINE__, __func__);
 	}
-
-	if (state != data->status.state) {
-		hl78xx_log_state_changed(state, data->status.state);
+	if (state != s) {
+		hl78xx_log_state_changed(state, s);
 	}
 }
 
 #ifdef CONFIG_PM_DEVICE
+
+/* -------------------------------------------------------------------------
+ * Power management
+ * ------------------------------------------------------------------------- */
+
 static int hl78xx_driver_pm_action(const struct device *dev, enum pm_device_action action)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)dev->data;
@@ -1605,9 +1451,8 @@ static int hl78xx_driver_pm_action(const struct device *dev, enum pm_device_acti
 #endif /* CONFIG_PM_DEVICE */
 
 /* -------------------------------------------------------------------------
- * Power management
+ * Initialization
  * ------------------------------------------------------------------------- */
-
 static int hl78xx_init(const struct device *dev)
 {
 	int ret;
@@ -1663,7 +1508,6 @@ static int hl78xx_init(const struct device *dev)
 			return -ENODEV;
 		}
 	}
-
 	/* GPIO configuration */
 	struct {
 		const struct gpio_dt_spec *spec;
@@ -1740,6 +1584,7 @@ static int hl78xx_init(const struct device *dev)
 #else
 	pm_device_init_suspended(dev);
 #endif /* CONFIG_PM_DEVICE */
+
 #ifdef CONFIG_MODEM_HL78XX_STAY_IN_BOOT_MODE_FOR_ROAMING
 	k_sem_take(&data->stay_in_boot_mode_sem, K_FOREVER);
 #endif
@@ -1747,10 +1592,6 @@ static int hl78xx_init(const struct device *dev)
 error:
 	return ret;
 }
-
-/* -------------------------------------------------------------------------
- * Device initialization
- * ------------------------------------------------------------------------- */
 
 int hl78xx_evt_notif_handler_set(hl78xx_evt_monitor_dispatcher_t handler)
 {
@@ -1763,7 +1604,7 @@ int hl78xx_evt_notif_handler_set(hl78xx_evt_monitor_dispatcher_t handler)
  * Maps each hl78xx_state to optional enter/leave/event handlers. NULL
  * entries mean the state has no action for that phase.
  */
-const struct hl78xx_state_handlers hl78xx_state_table[] = {
+const static struct hl78xx_state_handlers hl78xx_state_table[] = {
 	[MODEM_HL78XX_STATE_IDLE] = {hl78xx_on_idle_state_enter, hl78xx_on_idle_state_leave,
 				     hl78xx_idle_event_handler},
 	[MODEM_HL78XX_STATE_RESET_PULSE] = {hl78xx_on_reset_pulse_state_enter,
@@ -1820,8 +1661,8 @@ static DEVICE_API(cellular, hl78xx_api) = {
  * Device API and DT registration
  * ------------------------------------------------------------------------- */
 
-#define MODEM_HL78XX_DEFINE_INSTANCE(inst, power_ms, reset_ms, startup_ms, shutdown_ms, start,        \
-				     init_script, periodic_script)                                    \
+#define MODEM_HL78XX_DEFINE_INSTANCE(inst, power_ms, reset_ms, startup_ms, shutdown_ms, start,     \
+				     init_script, periodic_script)                                 \
 	static const struct hl78xx_config hl78xx_cfg_##inst = {                                    \
 		.uart = DEVICE_DT_GET(DT_INST_BUS(inst)),                                          \
 		.mdm_gpio_reset = GPIO_DT_SPEC_INST_GET_OR(inst, mdm_reset_gpios, {}),             \
@@ -1840,21 +1681,19 @@ static DEVICE_API(cellular, hl78xx_api) = {
 		.startup_time_ms = (startup_ms),                                                   \
 		.shutdown_time_ms = (shutdown_ms),                                                 \
 		.autostarts = (start),                                                             \
-		/* Run scripts at runtime via hl78xx_chat wrappers; avoid compile-time */ \
-		/* references to MODEM_CHAT_* objects from other TUs. */                       \
-		.init_chat_script = NULL,                                                         \
-		.periodic_chat_script = NULL,                                                     \
-	}; \
-	static struct hl78xx_data hl78xx_data_##inst = {                                              \
-		.buffers.delimiter = "\r\n",                                                          \
-		.buffers.eof_pattern = EOF_PATTERN,                                                   \
-		.buffers.termination_pattern = TERMINATION_PATTERN,                                   \
-	};                                                                                            \
-                                                                                                      \
-	PM_DEVICE_DT_INST_DEFINE(inst, hl78xx_driver_pm_action);                                      \
-                                                                                                      \
-	DEVICE_DT_INST_DEFINE(inst, hl78xx_init, PM_DEVICE_DT_INST_GET(inst), &hl78xx_data_##inst,    \
-			      &hl78xx_cfg_##inst, POST_KERNEL,                                        \
+		.init_chat_script = (init_script),                                                 \
+		.periodic_chat_script = (periodic_script),                                         \
+	};                                                                                         \
+	static struct hl78xx_data hl78xx_data_##inst = {                                           \
+		.buffers.delimiter = "\r\n",                                                       \
+		.buffers.eof_pattern = EOF_PATTERN,                                                \
+		.buffers.termination_pattern = TERMINATION_PATTERN,                                \
+	};                                                                                         \
+                                                                                                   \
+	PM_DEVICE_DT_INST_DEFINE(inst, hl78xx_driver_pm_action);                                   \
+                                                                                                   \
+	DEVICE_DT_INST_DEFINE(inst, hl78xx_init, PM_DEVICE_DT_INST_GET(inst), &hl78xx_data_##inst, \
+			      &hl78xx_cfg_##inst, POST_KERNEL,                                     \
 			      CONFIG_MODEM_HL78XX_DEV_INIT_PRIORITY, &hl78xx_api);
 
 #define MODEM_DEVICE_SWIR_HL78XX(inst)                                                             \

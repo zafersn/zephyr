@@ -84,6 +84,7 @@ void hl78xx_evt_monitor_dispatch(struct hl78xx_evt *notif)
 	STRUCT_SECTION_FOREACH(hl78xx_evt_monitor_entry, e) {
 		if (!is_paused(e)) {
 			if (is_direct(e)) {
+				LOG_DBG("evt_monitor_dispatch: calling direct global handler %p", e->handler);
 				e->handler(notif, NULL); /* NULL context for global listeners */
 			} else {
 				monitored = true;
@@ -96,6 +97,7 @@ void hl78xx_evt_monitor_dispatch(struct hl78xx_evt *notif)
 	for (struct hl78xx_evt_monitor_entry *e = monitor_list_head; e; e = e->next) {
 		if (!is_paused(e)) {
 			if (is_direct(e)) {
+				LOG_DBG("evt_monitor_dispatch: calling direct instance handler %p (ctx=%p)", e->handler, e);
 				e->handler(notif, e);
 			} else {
 				monitored = true;

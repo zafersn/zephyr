@@ -9,8 +9,7 @@ zephyr_library_sources(
     hl78xx.c
     hl78xx_sockets.c
     hl78xx_cfg.c
-  hl78xx_chat.c
-    hl78xx_utility.c
+    hl78xx_chat.c
     hl78xx_apis.c
 )
 

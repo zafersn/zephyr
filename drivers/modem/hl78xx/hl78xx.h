@@ -103,6 +103,7 @@
 
 /* Helper macros */
 #define ATOI(s_, value_, desc_) modem_atoi(s_, value_, desc_, __func__)
+#define ATOD(s_, value_, desc_) modem_atod(s_, value_, desc_, __func__)
 
 #define HL78XX_LOG_DBG(str, ...)                                                                   \
 	COND_CODE_1(CONFIG_MODEM_HL78XX_LOG_CONTEXT_VERBOSE_DEBUG, \
@@ -302,15 +303,12 @@ struct hl78xx_data {
 	struct modem_status status;
 	struct modem_gpio_callbacks gpio_cbs;
 	struct modem_event_system events;
-
 	struct k_work_delayable timeout_work;
-
 	/* Track leftover socket data state previously stored as a TU-global.
 	 * Moving this into the per-modem data reduces global BSS and keeps
 	 * state colocated with the modem instance.
 	 */
 	atomic_t state_leftover;
-
 #if defined(CONFIG_MODEM_HL78XX_RSSI_WORK)
 	struct k_work_delayable rssi_query_work;
 #endif
@@ -369,18 +367,6 @@ struct socket_read_data {
 bool hl78xx_is_registered(struct hl78xx_data *data);
 
 /**
- * @brief Generate a 32-bit hash from a string.
- *
- * Useful for generating identifiers (e.g., MAC address suffix) from a given string.
- *
- * @param str Input string to hash.
- * @param len Length of the input string.
- *
- * @return 32-bit hash value.
- */
-uint32_t hash32(const char *str, int len);
-
-/**
  * @brief DNS resolution work callback.
  *
  * @param dev Pointer to the device structure.
@@ -402,42 +388,6 @@ void iface_status_work_cb(struct hl78xx_data *data,
 			  modem_chat_script_callback script_user_callback);
 
 /**
- * @brief Convert a string to an integer with error handling.
- *
- * Similar to atoi, but allows specifying an error fallback and logs errors.
- *
- * @param s Input string to convert.
- * @param err_value Value to return on failure.
- * @param desc Description of the value for logging purposes.
- * @param func Function name for logging purposes.
- *
- * @return Converted integer on success, or err_value on failure.
- */
-int modem_atoi(const char *s, const int err_value, const char *desc, const char *func);
-
-/**
- * @brief Notify the system of socket data changes.
- *
- * Typically used when data has been received or transmitted on a socket.
- *
- * @param socket_id ID of the affected socket.
- * @param new_total New data count or buffer level associated with the socket.
- * @param user_data Pointer to user data associated with the notification.
- */
-void socket_notify_data(int socket_id, int new_total, void *user_data);
-
-/**
- * @brief Notify the system of tcp socket changes.
- *
- * Typically used when tcp connection failure has been received on a socket.
- *
- * @param socket_id ID of the affected socket.
- * @param tcp_notif Integer type. Indicates the cause of the TCP connection failure.
- * @param user_data Pointer to user data associated with the notification.
- */
-void tcp_notify_data(int socket_id, int tcp_notif, void *user_data);
-
-/**
  * @brief Send a command to the modem and wait for matching response(s).
  *
  * This function sends a raw command to the modem and processes its response using
@@ -456,6 +406,27 @@ int modem_dynamic_cmd_send(struct hl78xx_data *data,
 			   modem_chat_script_callback script_user_callback, const uint8_t *cmd,
 			   uint16_t cmd_len, const struct modem_chat_match *response_matches,
 			   uint16_t matches_size, bool user_cmd);
+
+#define HASH_MULTIPLIER 37
+/**
+ * @brief Generate a 32-bit hash from a string.
+ *
+ * Useful for generating identifiers (e.g., MAC address suffix) from a given string.
+ *
+ * @param str Input string to hash.
+ * @param len Length of the input string.
+ *
+ * @return 32-bit hash value.
+ */
+static inline uint32_t hash32(const char *str, int len)
+{
+	uint32_t h = 0;
+
+	for (int i = 0; i < len; ++i) {
+		h = (h * HASH_MULTIPLIER) + str[i];
+	}
+	return h;
+}
 
 /**
  * @brief Generate a pseudo-random MAC address based on the modem's IMEI.
@@ -483,6 +454,52 @@ static inline uint8_t *modem_get_mac(uint8_t *mac_addr, char *imei)
 	return mac_addr;
 }
 
+/**
+ * @brief  Convert string to long integer, but handle errors
+ *
+ * @param  s: string with representation of integer number
+ * @param  err_value: on error return this value instead
+ * @param  desc: name the string being converted
+ * @param  func: function where this is called (typically __func__)
+ *
+ * @retval return integer conversion on success, or err_value on error
+ */
+static inline int modem_atoi(const char *s, const int err_value, const char *desc, const char *func)
+{
+	int ret;
+	char *endptr;
+
+	ret = (int)strtol(s, &endptr, 10);
+	if (!endptr || *endptr != '\0') {
+		return err_value;
+	}
+	return ret;
+}
+
+/**
+ * @brief Convert a string to an double with error handling.
+ *
+ * Similar to atoi, but allows specifying an error fallback and logs errors.
+ *
+ * @param s Input string to convert.
+ * @param err_value Value to return on failure.
+ * @param desc Description of the value for logging purposes.
+ * @param func Function name for logging purposes.
+ *
+ * @return Converted double on success, or err_value on failure.
+ */
+static inline double modem_atod(const char *s, const double err_value, const char *desc,
+				const char *func)
+{
+	double ret;
+	char *endptr;
+
+	ret = strtod(s, &endptr);
+	if (!endptr || *endptr != '\0') {
+		return err_value;
+	}
+	return ret;
+}
 /**
  * @brief Small utility: safe strncpy that always NUL-terminates the destination.
  * This function copies a string from src to dst, ensuring that the destination
@@ -556,31 +573,6 @@ int hl78xx_get_band_default_config_for_rat(enum hl78xx_cell_rat_mode rat, char *
 					   size_t size_in_bytes);
 
 /**
- * @brief Trim leading zeros from a hexadecimal string.
- *
- * Removes any '0' characters from the beginning of the provided hex string,
- * returning a pointer to the first non-zero character.
- *
- * @param hex_str Null-terminated hexadecimal string.
- *
- * @return Pointer to the first non-zero digit in the string,
- *         or the last zero if the string is all zeros.
- */
-const char *hl78xx_trim_leading_zeros(const char *hex_str);
-
-/**
- * @brief Convert a binary bitmap to a trimmed hexadecimal string.
- *
- * Converts a bitmap into a hex string, removing leading zeros for a
- * compact representation. Useful for modem configuration commands.
- *
- * @param bitmap Pointer to the input binary bitmap.
- * @param hex_str Output buffer for the resulting hex string.
- * @param hex_str_len Size of the output buffer in bytes.
- */
-void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, size_t hex_str_len);
-
-/**
  * @brief Convert a hexadecimal string to a binary bitmap.
  *
  * Parses a hexadecimal string and converts it into a binary bitmap array.
@@ -592,18 +584,6 @@ void hl78xx_bitmap_to_hex_string_trimmed(const uint8_t *bitmap, char *hex_str, s
  * @retval Negative errno code on failure (e.g., invalid characters, overflow).
  */
 int hl78xx_hex_string_to_bitmap(const char *hex_str, uint8_t *bitmap_out);
-
-/**
- * @brief Extract the essential part of an APN string.
- *
- * This function extracts the essential part of an APN (Access Point Name)
- * string by removing any unnecessary prefixes or suffixes.
- *
- * @param full_apn The full APN string to extract from.
- * @param essential_apn Buffer to store the extracted essential APN.
- * @param max_len Maximum length of the essential APN buffer.
- */
-void hl78xx_extract_essential_part_apn(const char *full_apn, char *essential_apn, size_t max_len);
 
 /**
  * @brief hl78xx_api_func_get_registration_status - Brief description of the function.
