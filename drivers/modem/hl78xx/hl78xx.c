@@ -254,7 +254,6 @@ void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *
 	}
 	HL78XX_LOG_DBG("%s: %d", argv[0], registration_status);
 	if (registration_status == data->status.registration.network_state_current) {
-		LOG_DBG("Registration status unchanged: %d", registration_status);
 		return;
 	}
 	data->status.registration.network_state_previous =
@@ -443,9 +442,6 @@ void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t argc, void
 		data->kselacq_data.rat2 = 0;
 		data->kselacq_data.rat3 = 0;
 	}
-	HL78XX_LOG_DBG("%d %d [%s] [%d] [%d] [%d] [%d]", __LINE__, argc, argv[0],
-		       data->kselacq_data.mode, data->kselacq_data.rat1, data->kselacq_data.rat2,
-		       data->kselacq_data.rat3);
 }
 
 void hl78xx_on_kbndcfg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
@@ -481,7 +477,6 @@ void hl78xx_on_csq(struct modem_chat *chat, char **argv, uint16_t argc, void *us
 	if (argc < 3) {
 		return;
 	}
-	HL78XX_LOG_DBG("%d %d [%s] [%s] [%s]", __LINE__, argc, argv[0], argv[1], argv[2]);
 	data->status.rssi = ATOI(argv[1], 0, "rssi");
 }
 
@@ -492,7 +487,6 @@ void hl78xx_on_cesq(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	if (argc < 7) {
 		return;
 	}
-	HL78XX_LOG_DBG("%d %d [%s] [%s] [%s]", __LINE__, argc, argv[0], argv[1], argv[2]);
 	data->status.rsrq = ATOI(argv[5], 0, "rsrq");
 	data->status.rsrp = ATOI(argv[6], 0, "rsrp");
 }
@@ -504,7 +498,6 @@ void hl78xx_on_cfun(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	if (argc < 2) {
 		return;
 	}
-	HL78XX_LOG_DBG("%d %d [%s] [%s] ", __LINE__, argc, argv[0], argv[1]);
 	data->status.phone_functionality.functionality = ATOI(argv[1], 0, "phone_func");
 	data->status.phone_functionality.in_progress = false;
 }
@@ -555,7 +548,7 @@ static int modem_init_chat(const struct device *dev)
 		.filter = data->buffers.filter,
 		.filter_size = data->buffers.filter ? strlen(data->buffers.filter) : 0,
 		.argv = data->buffers.argv,
-		.argv_size = (uint16_t)(sizeof(data->buffers.argv) / sizeof(data->buffers.argv[0])),
+		.argv_size = (uint16_t)ARRAY_SIZE(data->buffers.argv),
 		.unsol_matches = hl78xx_get_unsol_matches(),
 		.unsol_matches_size = (uint16_t)hl78xx_get_unsol_matches_size(),
 	};
@@ -1092,10 +1085,6 @@ static void hl78xx_await_registered_event_handler(struct hl78xx_data *data, enum
 		 * TODO: add a mechanism to exit this state and retry the registration process
 		 *
 		 */
-		HL78XX_LOG_DBG("%d: %d %d", __LINE__,
-			       data->status.registration.is_registered_previously,
-			       data->status.phone_functionality.functionality);
-
 		LOG_WRN("Modem failed to register to the network within %d seconds",
 			MDM_REGISTRATION_TIMEOUT);
 
@@ -1138,7 +1127,6 @@ static void hl78xx_carrier_on_event_handler(struct hl78xx_data *data, enum hl78x
 		break;
 
 	case MODEM_HL78XX_EVENT_TIMEOUT:
-		LOG_DBG("Triggering DNS update %d", __LINE__);
 		dns_work_cb(data->dev, true);
 		break;
 
@@ -1554,7 +1542,6 @@ static int hl78xx_init(const struct device *dev)
 	}
 
 #if HAS_GPIO6_GPIO
-	LOG_DBG("%d %s: GPIO6 is enabled", __LINE__, __func__);
 	/* GPIO6 interrupt setup */
 	gpio_init_callback(&data->gpio_cbs.gpio6_cb, mdm_gpio6_callback_isr,
 			   BIT(config->mdm_gpio_gpio6.pin));

@@ -345,8 +345,6 @@ void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t argc, vo
 	socket_data = (struct hl78xx_socket_data *)data->offload_dev->data;
 	socket_id = ATOI(argv[1], -1, "socket_id");
 	tcp_notif = ATOI(argv[2], -1, "tcp_notif");
-
-	HL78XX_LOG_DBG("%d %d %d", __LINE__, socket_id, tcp_notif);
 	if (tcp_notif == -1) {
 		return;
 	}
@@ -438,17 +436,9 @@ void hl78xx_on_kxxxsocket_create(struct modem_chat *chat, char **argv, uint16_t 
 		LOG_DBG("%s: unable to parse socket id from '%s'", __func__, argv[1]);
 		goto exit;
 	}
-
-	LOG_DBG("%s: parsed socket id %d", __func__, socket_id);
-
 	/* Try to find a reserved/new socket slot and assign the modem-provided id. */
 	sock = modem_socket_from_newid(&socket_data->socket_config);
 	if (!sock) {
-		/* No reserved slot found; attempt to find a socket that is allocated but
-		 * without an assigned id (id < base_socket_id indicates unused), or simply
-		 * log and return.
-		 */
-		LOG_DBG("%s: no reserved socket slot found to assign id %d", __func__, socket_id);
 		goto exit;
 	}
 
@@ -931,7 +921,6 @@ static int handle_eof_pattern(struct hl78xx_socket_data *socket_data)
 		/* Mark that payload was successfully pushed and EOF was detected */
 		socket_data->parser_socket_data_received = true;
 		socket_data->parser_eof_detected = true;
-		LOG_DBG("handle_eof_pattern: parser_eof_detected=1 parser_socket_data_received=1");
 		LOG_DBG("handle_eof_pattern: pushed %d bytes to ring_buf; "
 			"collected_buf_len(before)=%u",
 			ret, socket_data->collected_buf_len);
@@ -1095,14 +1084,12 @@ static void modem_pipe_callback(struct modem_pipe *pipe, enum modem_pipe_event e
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
 
-	HL78XX_LOG_DBG("%d Pipe event received: %d", __LINE__, event);
 	switch (event) {
 	case MODEM_PIPE_EVENT_RECEIVE_READY:
 		modem_process_handler(data);
 		break;
 
 	case MODEM_PIPE_EVENT_TRANSMIT_IDLE:
-		LOG_DBG("modem_pipe_callback: TRANSMIT_IDLE - giving script_stopped_sem_tx_int");
 		k_sem_give(&data->script_stopped_sem_tx_int);
 		break;
 
@@ -1419,7 +1406,6 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 	}
 	is_udp = (sock->ip_proto == IPPROTO_UDP);
 	if (is_udp) {
-		LOG_DBG("create_socket: UDP socket, calling send_udp_config");
 		ret = send_udp_config(addr, data, sock);
 		LOG_DBG("create_socket: send_udp_config returned %d", ret);
 		return ret;
@@ -1559,7 +1545,6 @@ static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrle
 	/* Check if socket is allocated */
 	if (modem_socket_is_allocated(&socket_data->socket_config, sock)) {
 		/* Trigger socket creation */
-		LOG_DBG("offload_bind: socket allocated, invoking create_socket");
 		ret = create_socket(sock, addr, socket_data);
 		LOG_DBG("offload_bind: create_socket returned %d", ret);
 		if (ret < 0) {
@@ -1714,7 +1699,6 @@ static int hl78xx_perform_receive_transaction(struct hl78xx_socket_data *socket_
 			  socket_data->mdata_global);
 
 	rv = k_sem_take(&socket_data->mdata_global->script_stopped_sem_tx_int, K_FOREVER);
-	LOG_DBG("hl78xx_perform_receive_transaction: waiting for TX semaphore");
 	if (rv < 0) {
 		LOG_ERR("hl78xx_perform_receive_transaction: k_sem_take(tx) returned %d", rv);
 		return rv;
@@ -1726,10 +1710,7 @@ static int hl78xx_perform_receive_transaction(struct hl78xx_socket_data *socket_
 		LOG_ERR("Error sending read command: %d", ret);
 		return ret;
 	}
-
-	LOG_DBG("hl78xx_perform_receive_transaction: waiting for RX semaphore");
 	rv = k_sem_take(&socket_data->mdata_global->script_stopped_sem_rx_int, K_FOREVER);
-	LOG_DBG("hl78xx_perform_receive_transaction: RX semaphore taken (rv=%d)", rv);
 	if (rv < 0) {
 		return rv;
 	}
@@ -1996,7 +1977,6 @@ static int transmit_regular_data(struct hl78xx_socket_data *socket_data, const c
 		return ret;
 	}
 	ret = k_sem_take(&socket_data->mdata_global->script_stopped_sem_tx_int, K_FOREVER);
-	LOG_DBG("transmit_regular_data: waiting for final TX semaphore before EOF transmit");
 	if (ret < 0) {
 		LOG_ERR("transmit_regular_data: k_sem_take(tx) returned %d", ret);
 		return ret;
@@ -2134,11 +2114,6 @@ static ssize_t offload_sendto(void *obj, const void *buf, size_t len, int flags,
 		errno = EINVAL;
 		return -1;
 	}
-
-	HL78XX_LOG_DBG("%d %d %d", __LINE__,
-		       socket_data->mdata_global->status.registration.is_registered_currently,
-		       socket_data->mdata_global->status.registration.network_state_current);
-
 	if (!hl78xx_is_registered(socket_data->mdata_global)) {
 		LOG_ERR("Modem currently not attached to the network!");
 		return -EAGAIN;
@@ -2271,7 +2246,6 @@ static ssize_t offload_sendmsg(void *obj, const struct msghdr *msg, int flags)
 		}
 		full_len += msg->msg_iov[i].iov_len;
 	}
-	HL78XX_LOG_DBG("msg_iovlen:%zd flags:%d, full_len:%zd", msg->msg_iovlen, flags, full_len);
 	while (full_len > sent) {
 		int removed = 0;
 		int i = 0;
@@ -2376,7 +2350,6 @@ static void socket_notify_data(int socket_id, int new_total, void *user_data)
 	if (!sock) {
 		return;
 	}
-	HL78XX_LOG_DBG("%d new total: %d sckid: %d", __LINE__, new_total, socket_id);
 	/* Update the packet size */
 	ret = modem_socket_packet_size_update(&socket_data->socket_config, sock, new_total);
 	if (ret < 0) {
@@ -2468,7 +2441,6 @@ static ssize_t hl78xx_send_cert(struct hl78xx_socket_data *socket_data, const ch
 		LOG_ERR("Final confirmation failed: %d", ret);
 		goto cleanup;
 	}
-	HL78XX_LOG_DBG("%d %d %d", __LINE__, sock_written, ret);
 cleanup:
 	k_mutex_unlock(&socket_data->mdata_global->tx_lock);
 	return (ret < 0) ? -1 : sock_written;
