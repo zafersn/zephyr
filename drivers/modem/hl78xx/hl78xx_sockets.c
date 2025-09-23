@@ -47,8 +47,10 @@ LOG_MODULE_REGISTER(hl78xx_socket, CONFIG_MODEM_LOG_LEVEL);
 
 #define MODEM_SOCKET_DATA_LEFTOVER_STATE_BIT     (0)
 #define HL78XX_UART_PIPE_WORK_SOCKET_BUFFER_SIZE 32
-#define HL78XX_TCP_STATUS_ID(x)                  ((x > 1 ? (x) - 1 : 0)) /* modem socket id is 1-based */
-#define HL78XX_UDP_STATUS_ID(x)                  ((x > 1 ? (x) - 1 : 0)) /* modem socket id is 1-based */
+/* modem socket id is 1-based */
+#define HL78XX_TCP_STATUS_ID(x)                  ((x > 1 ? (x) - 1 : 0))
+/* modem socket id is 1-based */
+#define HL78XX_UDP_STATUS_ID(x)                  ((x > 1 ? (x) - 1 : 0))
 
 #define DNS_SERVERS_COUNT                                                                          \
 	(0 + (IS_ENABLED(CONFIG_NET_IPV6) ? 1 : 0) + (IS_ENABLED(CONFIG_NET_IPV4) ? 1 : 0) +       \
@@ -344,7 +346,7 @@ void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t argc, vo
 	int tcp_notif = -1;
 
 	if (!data || !socket_data) {
-		LOG_ERR("hl78xx_on_ktcpnotif: invalid user_data");
+		LOG_ERR("%s: invalid user_data", __func__);
 		return;
 	}
 	if (argc < 2) {
@@ -385,7 +387,7 @@ void hl78xx_on_ktcpind(struct modem_chat *chat, char **argv, uint16_t argc, void
 	int tcp_conn_stat = -1;
 
 	if (!data || !socket_data) {
-		LOG_ERR("hl78xx_on_ktcpind: invalid user_data");
+		LOG_ERR("%s: invalid user_data", __func__);
 		return;
 	}
 	if (argc < 3 || !argv[1] || !argv[2]) {
@@ -435,7 +437,7 @@ void hl78xx_on_ktcpsocket_create(struct modem_chat *chat, char **argv, uint16_t 
 	/* argv[0] may contain extra CSV fields; parse leading integer */
 	socket_id = ATOI(argv[1], -1, "socket_id");
 	if (socket_id <= 0) {
-		LOG_DBG("%s: unable to parse socket id from '%s'", __func__, argv[1]);
+		LOG_DBG("unable to parse socket id from '%s'", argv[1]);
 		goto exit;
 	}
 	/* Try to find a reserved/new socket slot and assign the modem-provided id. */
@@ -486,7 +488,7 @@ void hl78xx_on_kudpsocket_create(struct modem_chat *chat, char **argv, uint16_t 
 	/* argv[0] may contain extra CSV fields; parse leading integer */
 	socket_id = ATOI(argv[1], -1, "socket_id");
 	if (socket_id <= 0) {
-		LOG_DBG("%s: unable to parse socket id from '%s'", __func__, argv[1]);
+		LOG_DBG("unable to parse socket id from '%s'", argv[1]);
 		goto exit;
 	}
 	/* Try to find a reserved/new socket slot and assign the modem-provided id. */
@@ -558,7 +560,7 @@ void hl78xx_on_kstatev_parser(struct hl78xx_data *data, int state, int rat_mode)
 	}
 }
 /**
- * @brief This function doesnt handle incoming UDP data.
+ * @brief This function doesn't handle incoming UDP data.
  * It is just a placeholder for verbose debug logging of incoming UDP data.
  * +KUDP_RCV: <remote_addr>,<remote_port>,
  */
@@ -957,11 +959,11 @@ static int handle_eof_pattern(struct hl78xx_socket_data *socket_data)
 		/* Mark that payload was successfully pushed and EOF was detected */
 		socket_data->parser_socket_data_received = true;
 		socket_data->parser_eof_detected = true;
-		LOG_DBG("handle_eof_pattern: pushed %d bytes to ring_buf; "
+		LOG_DBG("pushed %d bytes to ring_buf; "
 			"collected_buf_len(before)=%u",
 			ret, socket_data->collected_buf_len);
 		socket_data->collected_buf_len += ret;
-		LOG_DBG("handle_eof_pattern: parser_socket_data_received=1 "
+		LOG_DBG("parser_socket_data_received=1 "
 			"collected_buf_len(after)=%u",
 			socket_data->collected_buf_len);
 		return ret;
@@ -999,6 +1001,7 @@ static bool handle_delimiter_complete(struct hl78xx_socket_data *socket_data,
 static inline bool modem_chat_match_exact(struct hl78xx_socket_data *socket_data, const char *match)
 {
 	size_t size_match = strlen(match);
+
 	if (socket_data->receive_buf.len != size_match) {
 		return false;
 	}
@@ -1007,6 +1010,8 @@ static inline bool modem_chat_match_exact(struct hl78xx_socket_data *socket_data
 
 static void socket_process_bytes(struct hl78xx_socket_data *socket_data, char byte)
 {
+	const size_t cme_size = strlen(CME_ERROR_STRING);
+
 	if (is_receive_buffer_full(socket_data)) {
 		LOG_WRN("Receive buffer overrun");
 		parser_reset(socket_data);
@@ -1028,23 +1033,20 @@ static void socket_process_bytes(struct hl78xx_socket_data *socket_data, char by
 			LOG_DBG("CONNECT matched. Expecting %d more bytes.",
 				socket_data->expected_buf_len);
 			return;
-		} else {
-			/* CME error can be longer than the buffer length (prefix match). */
-			const size_t cme_size = strlen(CME_ERROR_STRING);
-			/* Partial CME ERROR match: length must be at least CME string length */
-			if (socket_data->receive_buf.len >= cme_size &&
-			    modem_chat_match_matches_received(socket_data, CME_ERROR_STRING,
-							      (uint16_t)cme_size)) {
-				socket_data->parser_state =
-					HL78XX_PARSER_ERROR_MATCHED; /* prevent further parsing */
-				LOG_ERR("CME ERROR received. Connection failed.");
-				socket_data->expected_buf_len = 0;
-				socket_data->collected_buf_len = 0;
-				parser_reset(socket_data);
-				socket_data->socket_data_error = true;
-				k_sem_give(&socket_data->mdata_global->script_stopped_sem_rx_int);
-				return;
-			}
+		}
+		/* Partial CME ERROR match: length must be at least CME string length */
+		if (socket_data->receive_buf.len >= cme_size &&
+		    modem_chat_match_matches_received(socket_data, CME_ERROR_STRING,
+						      (uint16_t)cme_size)) {
+			socket_data->parser_state =
+				HL78XX_PARSER_ERROR_MATCHED; /* prevent further parsing */
+			LOG_ERR("CME ERROR received. Connection failed.");
+			socket_data->expected_buf_len = 0;
+			socket_data->collected_buf_len = 0;
+			parser_reset(socket_data);
+			socket_data->socket_data_error = true;
+			k_sem_give(&socket_data->mdata_global->script_stopped_sem_rx_int);
+			return;
 		}
 	}
 	if (socket_data->parser_state == HL78XX_PARSER_CONNECT_MATCHED &&
@@ -1094,7 +1096,7 @@ static int modem_process_handler(struct hl78xx_data *data)
 		socket_process_bytes(socket_data, work_buf_local[i]);
 	}
 
-	LOG_DBG("modem_process_handler: post-process state=%d recv_len=%d recv_buf.len=%u "
+	LOG_DBG("post-process state=%d recv_len=%d recv_buf.len=%u "
 		"expected=%u collected=%u socket_data_received=%d",
 		socket_data->parser_state, recv_len, socket_data->receive_buf.len,
 		socket_data->expected_buf_len, socket_data->collected_buf_len,
@@ -1425,7 +1427,7 @@ error:
 static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 			 struct hl78xx_socket_data *data)
 {
-	LOG_DBG("create_socket: entry fd=%d id=%d", sock->sock_fd, sock->id);
+	LOG_DBG("entry fd=%d id=%d", sock->sock_fd, sock->id);
 	int af;
 	uint16_t dst_port;
 	char ip_str[NET_IPV6_ADDR_LEN];
@@ -1443,7 +1445,7 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 	is_udp = (sock->ip_proto == IPPROTO_UDP);
 	if (is_udp) {
 		ret = send_udp_config(addr, data, sock);
-		LOG_DBG("create_socket: send_udp_config returned %d", ret);
+		LOG_DBG("send_udp_config returned %d", ret);
 		return ret;
 	}
 	mode = (sock->ip_proto == IPPROTO_TLS_1_2) ? 3 : 0;
@@ -1453,11 +1455,11 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 		errno = EPROTONOSUPPORT;
 		return -1;
 	}
-	LOG_DBG("create_socket: TCP/TLS socket, calling send_tcp_or_tls_config af=%d port=%u "
+	LOG_DBG("TCP/TLS socket, calling send_tcp_or_tls_config af=%d port=%u "
 		"mode=%d",
 		af, dst_port, mode);
 	ret = send_tcp_or_tls_config(sock, dst_port, af, mode, data);
-	LOG_DBG("create_socket: send_tcp_or_tls_config returned %d", ret);
+	LOG_DBG("send_tcp_or_tls_config returned %d", ret);
 	return ret;
 }
 
@@ -1508,10 +1510,11 @@ static int socket_delete(struct hl78xx_socket_data *socket_data, struct modem_so
 static int offload_socket(int family, int type, int proto)
 {
 	int ret;
-
-	HL78XX_LOG_DBG("%d %d %d %d", __LINE__, family, type, proto);
 	/* defer modem's socket create call to bind(); use accessor and check */
 	struct hl78xx_socket_data *g = hl78xx_get_socket_global();
+
+	HL78XX_LOG_DBG("%d %d %d %d", __LINE__, family, type, proto);
+
 	if (!g) {
 		LOG_ERR("Socket global not initialized");
 		errno = ENODEV;
@@ -1567,7 +1570,7 @@ static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrle
 		errno = EINVAL;
 		return -1;
 	}
-	LOG_DBG("offload_bind: entry for socket fd=%d id=%d", ((struct modem_socket *)obj)->sock_fd,
+	LOG_DBG("entry for socket fd=%d id=%d", ((struct modem_socket *)obj)->sock_fd,
 		((struct modem_socket *)obj)->id);
 	/*  Save bind address information */
 	memcpy(&sock->src, addr, sizeof(*addr));
@@ -1575,7 +1578,7 @@ static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrle
 	if (modem_socket_is_allocated(&socket_data->socket_config, sock)) {
 		/* Trigger socket creation */
 		ret = create_socket(sock, addr, socket_data);
-		LOG_DBG("offload_bind: create_socket returned %d", ret);
+		LOG_DBG("create_socket returned %d", ret);
 		if (ret < 0) {
 			LOG_ERR("%d %s SOCKET CREATION", __LINE__, __func__);
 			return -1;
@@ -1706,7 +1709,7 @@ static int hl78xx_perform_receive_transaction(struct hl78xx_socket_data *socket_
 
 	rv = k_sem_take(&socket_data->mdata_global->script_stopped_sem_tx_int, K_FOREVER);
 	if (rv < 0) {
-		LOG_ERR("hl78xx_perform_receive_transaction: k_sem_take(tx) returned %d", rv);
+		LOG_ERR("%s: k_sem_take(tx) returned %d", __func__, rv);
 		return rv;
 	}
 
@@ -1752,13 +1755,14 @@ static void setup_socket_data(struct hl78xx_socket_data *socket_data, struct mod
 static void check_tcp_state_if_needed(struct hl78xx_socket_data *socket_data,
 				      struct modem_socket *sock)
 {
+	const char *check_ktcp_stat = "AT+KTCPSTAT";
+	/* Only check for TCP sockets */
 	if (sock->type != SOCK_STREAM) {
 		return;
 	}
 	if (atomic_test_and_clear_bit(&socket_data->mdata_global->state_leftover,
 				      MODEM_SOCKET_DATA_LEFTOVER_STATE_BIT) &&
 	    sock && sock->ip_proto == IPPROTO_TCP) {
-		const char *check_ktcp_stat = "AT+KTCPSTAT";
 		modem_dynamic_cmd_send(socket_data->mdata_global, NULL, check_ktcp_stat,
 				       strlen(check_ktcp_stat), hl78xx_get_ktcp_state_match(), 1,
 				       true);
@@ -1909,11 +1913,10 @@ static int send_data_buffer(struct hl78xx_socket_data *socket_data, const char *
 		return 0;
 	}
 	while (len > 0) {
-		LOG_DBG("send_data_buffer: waiting for TX semaphore (offset=%u len=%d)", offset,
-			len);
+		LOG_DBG("waiting for TX semaphore (offset=%u len=%d)", offset, len);
 		if (k_sem_take(&socket_data->mdata_global->script_stopped_sem_tx_int, K_FOREVER) <
 		    0) {
-			LOG_ERR("send_data_buffer: k_sem_take(tx) failed");
+			LOG_ERR("%s: k_sem_take(tx) failed", __func__);
 			return -1;
 		}
 		ret = modem_pipe_transmit(socket_data->mdata_global->uart_pipe,
@@ -1966,7 +1969,7 @@ static int transmit_regular_data(struct hl78xx_socket_data *socket_data, const c
 	}
 	ret = k_sem_take(&socket_data->mdata_global->script_stopped_sem_tx_int, K_FOREVER);
 	if (ret < 0) {
-		LOG_ERR("transmit_regular_data: k_sem_take(tx) returned %d", ret);
+		LOG_ERR("%s: k_sem_take(tx) returned %d", __func__, ret);
 		return ret;
 	}
 	return modem_pipe_transmit(socket_data->mdata_global->uart_pipe,
@@ -2071,15 +2074,15 @@ static int handle_tls_sockopts(void *obj, int optname, const void *optval, sockl
 static int offload_setsockopt(void *obj, int level, int optname, const void *optval,
 			      socklen_t optlen)
 {
-	HL78XX_LOG_DBG("%d level: %d optname: %d", __LINE__, level, optname);
+	int ret = 0;
 
 	if (!IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS)) {
 		return -EINVAL;
 	}
 	if (level == SOL_TLS) {
-		int r = handle_tls_sockopts(obj, optname, optval, optlen);
-		if (r < 0) {
-			hl78xx_set_errno_from_code(r);
+		ret = handle_tls_sockopts(obj, optname, optval, optlen);
+		if (ret < 0) {
+			hl78xx_set_errno_from_code(ret);
 			return -1;
 		}
 		return 0;
@@ -2125,7 +2128,8 @@ static ssize_t offload_sendto(void *obj, const void *buf, size_t len, int flags,
 	ret = send_socket_data(obj, socket_data, to, buf, len, K_SECONDS(MDM_CMD_TIMEOUT));
 	if (ret < 0) {
 		/* Map internal negative return codes to positive errno values. Use EIO as
-		 * a conservative fallback when ret is non-negative (unexpected) */
+		 * a conservative fallback when ret is non-negative (unexpected)
+		 */
 		hl78xx_set_errno_from_code(ret);
 		return -1;
 	}
@@ -2321,7 +2325,7 @@ static void socket_notify_data(int socket_id, int new_total, void *user_data)
 		(struct hl78xx_socket_data *)data->offload_dev->data;
 
 	if (!data || !socket_data) {
-		LOG_ERR("socket_notify_data: invalid user_data");
+		LOG_ERR("%s: invalid user_data", __func__);
 		return;
 	}
 	sock = modem_socket_from_id(&socket_data->socket_config, socket_id);
@@ -2444,7 +2448,6 @@ static int map_credentials(struct hl78xx_socket_data *socket_data, const void *o
 	for (i = 0; i < tags_len; i++) {
 		tag = sec_tags[i];
 		cert = credential_next_get(tag, NULL);
-		LOG_DBG("Processing tag: %d %d", tag, cert != NULL);
 		while (cert != NULL) {
 			switch (cert->type) {
 			case TLS_CREDENTIAL_CA_CERTIFICATE:

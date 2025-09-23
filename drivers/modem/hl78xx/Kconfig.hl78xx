@@ -541,7 +541,7 @@ config NTN_DYNAMIC_POSREQ_UPDATE
 	bool "Require position update on POSREQ in Dynamic Mode"
 	default y
 	help
-	  If enabled, the UE position must be updated after receiving unsolicited +KNTNEV: 
+	  If enabled, the UE position must be updated after receiving unsolicited +KNTNEV:
 	  'POSREQ' indication, before any outgoing network operation in dynamic mode.
 endif # MODEM_HL78XX_NBNTN_POSITIONING
 endif # MODEM_HL78XX_RAT_NBNTN

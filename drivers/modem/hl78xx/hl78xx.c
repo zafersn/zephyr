@@ -214,7 +214,7 @@ static void hl78xx_event_dispatch_handler(struct k_work *item)
 	events_cnt = (uint8_t)ring_buf_get(&data->events.event_rb, events,
 					   sizeof(data->events.event_buf));
 	k_mutex_unlock(&data->events.event_rb_lock);
-	LOG_DBG("event_dispatch_handler: dequeued %d events", events_cnt);
+	LOG_DBG("dequeued %d events", events_cnt);
 
 	for (uint8_t i = 0; i < events_cnt; i++) {
 		hl78xx_event_handler(data, (enum hl78xx_event)events[i]);
