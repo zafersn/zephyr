@@ -50,12 +50,14 @@ int hl78xx_api_func_get_signal(const struct device *dev, const enum cellular_sig
 	/* Run chat script */
 	switch (type) {
 	case CELLULAR_SIGNAL_RSSI:
-		ret = hl78xx_send_cmd(data, signal_cmd_csq, NULL, hl78xx_get_allow_match(), hl78xx_get_allow_match_size());
+		ret = hl78xx_send_cmd(data, signal_cmd_csq, NULL, hl78xx_get_allow_match(),
+				      hl78xx_get_allow_match_size());
 		break;
 
 	case CELLULAR_SIGNAL_RSRP:
 	case CELLULAR_SIGNAL_RSRQ:
-		ret = hl78xx_send_cmd(data, signal_cmd_cesq, NULL, hl78xx_get_allow_match(), hl78xx_get_allow_match_size());
+		ret = hl78xx_send_cmd(data, signal_cmd_cesq, NULL, hl78xx_get_allow_match(),
+				      hl78xx_get_allow_match_size());
 		break;
 
 	default:
@@ -165,7 +167,8 @@ int hl78xx_api_func_get_modem_info_vendor(const struct device *dev,
 
 	case HL78XX_MODEM_INFO_NETWORK_OPERATOR:
 		/* Network operator not currently tracked; return empty or implement tracking */
-		ret = hl78xx_send_cmd(data, network_operator, NULL, hl78xx_get_allow_match(), hl78xx_get_allow_match_size());
+		ret = hl78xx_send_cmd(data, network_operator, NULL, hl78xx_get_allow_match(),
+				      hl78xx_get_allow_match_size());
 		if (ret < 0) {
 			LOG_ERR("Failed to get network operator");
 		}

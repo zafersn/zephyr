@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/******************************************************************************
+/*
+ *****************************************************************************
  * hl78xx_chat.c
  *
  * Centralized translation unit for MODEM_CHAT_* macro-generated objects and
@@ -15,8 +16,9 @@
  * Contract:
  *  - Other translation units MUST NOT take addresses of the MODEM_CHAT_*
  *    symbols or use ARRAY_SIZE() on them at file scope. Use the getters
- *    (hl78xx_get_*) and runners (hl78xx_run_*_script[_async]) instead.
- ******************************************************************************/
+ *    (hl78xx_get_*) and runners (hl78xx_ run_*_script[_async]) instead.
+ *****************************************************************************
+ */
 
 #include "hl78xx.h"
 #include "hl78xx_chat.h"
@@ -36,7 +38,9 @@ void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void
 void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_ktcpnotif(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 /* Handler implemented to assign modem-provided udp socket ids */
-void hl78xx_on_kxxxsocket_create(struct modem_chat *chat, char **argv, uint16_t argc,
+void hl78xx_on_kudpsocket_create(struct modem_chat *chat, char **argv, uint16_t argc,
+				 void *user_data);
+void hl78xx_on_ktcpsocket_create(struct modem_chat *chat, char **argv, uint16_t argc,
 				 void *user_data);
 /* Handler implemented to assign modem-provided tcp socket ids */
 void hl78xx_on_ktcpind(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
@@ -171,9 +175,9 @@ MODEM_CHAT_SCRIPT_DEFINE(hl78xx_pwroff_script, hl78xx_pwroff_cmds, hl78xx_abort_
  */
 MODEM_CHAT_MATCHES_DEFINE(connect_matches, MODEM_CHAT_MATCH(CONNECT_STRING, "", NULL),
 			  MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
-MODEM_CHAT_MATCH_DEFINE(kudpind_match, "+KUDP_IND: ", ",", hl78xx_on_kxxxsocket_create);
+MODEM_CHAT_MATCH_DEFINE(kudpind_match, "+KUDP_IND: ", ",", hl78xx_on_kudpsocket_create);
 MODEM_CHAT_MATCH_DEFINE(ktcpind_match, "+KTCP_IND: ", ",", hl78xx_on_ktcpind);
-MODEM_CHAT_MATCH_DEFINE(ktcpcfg_match, "+KTCPCFG: ", "", hl78xx_on_kxxxsocket_create);
+MODEM_CHAT_MATCH_DEFINE(ktcpcfg_match, "+KTCPCFG: ", "", hl78xx_on_ktcpsocket_create);
 MODEM_CHAT_MATCH_DEFINE(cgdcontrdp_match, "+CGCONTRDP: ", ",", hl78xx_on_cgdcontrdp);
 MODEM_CHAT_MATCH_DEFINE(ktcp_state_match, "+KTCPSTAT: ", ",", NULL);
 

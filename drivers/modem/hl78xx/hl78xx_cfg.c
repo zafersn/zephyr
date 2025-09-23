@@ -1,10 +1,15 @@
 /*
+ * Copyright (c) 2025 Netfeasa Ltd.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
  * hl78xx_cfg.c
  *
  * Extracted helper implementations for RAT, band and APN configuration to
  * keep the main state-machine TU small and maintainable.
  */
-
 #include "hl78xx.h"
 #include "hl78xx_cfg.h"
 #include "hl78xx_chat.h"
@@ -27,6 +32,7 @@ int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 	    (data->kselacq_data.rat1 == 0 && data->kselacq_data.rat2 == 0 &&
 	     data->kselacq_data.rat3 == 0)) {
 		char cmd_kselq[] = "AT+KSELACQ=0," CONFIG_MODEM_HL78XX_AUTORAT_PRL_PROFILES;
+
 		ret = modem_dynamic_cmd_send(data, NULL, cmd_kselq, strlen(cmd_kselq),
 					     hl78xx_get_ok_match(), 1, false);
 		if (ret < 0) {
@@ -121,6 +127,7 @@ int hl78xx_band_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 		}
 #else
 	int rat = rat_config_request;
+
 #endif
 		ret = hl78xx_get_band_default_config_for_rat(rat, bnd_bitmap,
 							     ARRAY_SIZE(bnd_bitmap));
