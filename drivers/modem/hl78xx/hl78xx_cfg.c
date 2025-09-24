@@ -164,6 +164,7 @@ error:
 int hl78xx_extra_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 			 enum hl78xx_cell_rat_mode rat_config_request)
 {
+#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
 	int ret = 0;
 	char cmd_kntncfg[64] = {0};
 	char *pos_provider = NULL;
@@ -172,7 +173,6 @@ int hl78xx_extra_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
 #ifdef CONFIG_NTN_POSITION_SOURCE_IGNSS
 	pos_provider = "IGNSS";
 #else
@@ -192,9 +192,11 @@ int hl78xx_extra_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 	if (ret < 0) {
 		goto error;
 	}
-#endif
+
 error:
 	return ret;
+#endif
+	return 0;
 }
 
 int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size)

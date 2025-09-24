@@ -1132,11 +1132,11 @@ static void hl78xx_await_registered_event_handler(struct hl78xx_data *data, enum
 	case MODEM_HL78XX_EVENT_SUSPEND:
 		hl78xx_enter_state(data, MODEM_HL78XX_STATE_INIT_POWER_OFF);
 		break;
-
+#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
 	case MODEM_HL78XX_EVENT_NTN_POSREQ:
 		hl78xx_run_ntn_pos_script_async(data);
 		break;
-
+#endif /* CONFIG_MODEM_HL78XX_RAT_NBNTN */
 	default:
 		break;
 	}

@@ -175,7 +175,7 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_pwroff_cmds,
 
 MODEM_CHAT_SCRIPT_DEFINE(hl78xx_pwroff_script, hl78xx_pwroff_cmds, hl78xx_abort_matches,
 			 hl78xx_chat_callback_handler, 4);
-
+#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
 MODEM_CHAT_SCRIPT_CMDS_DEFINE(
 	hl78xx_ntn_pos_cmds,
 	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KNTNCMD=\"POS\",\"" CONFIG_NTN_MANUAL_LATITUDE
@@ -184,6 +184,7 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(
 				   hl78xx_ok_match));
 MODEM_CHAT_SCRIPT_DEFINE(hl78xx_ntn_pos_script, hl78xx_ntn_pos_cmds, hl78xx_abort_matches,
 			 hl78xx_chat_callback_handler, 10);
+#endif
 /* Socket-specific matches and wrappers exposed for the sockets translation
  * unit. These were extracted from hl78xx_sockets.c to centralize chat
  * definitions.
@@ -386,7 +387,7 @@ int hl78xx_run_pwroff_script_async(struct hl78xx_data *data)
 	}
 	return modem_chat_run_script_async(&data->chat, &hl78xx_pwroff_script);
 }
-
+#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
 int hl78xx_run_ntn_pos_script_async(struct hl78xx_data *data)
 {
 	if (!data) {
@@ -394,3 +395,4 @@ int hl78xx_run_ntn_pos_script_async(struct hl78xx_data *data)
 	}
 	return modem_chat_run_script_async(&data->chat, &hl78xx_ntn_pos_script);
 }
+#endif
