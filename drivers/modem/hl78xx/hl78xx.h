@@ -659,4 +659,13 @@ void notif_carrier_on(const struct device *dev);
  */
 int check_if_any_socket_connected(const struct device *dev);
 
+#ifdef CONFIG_MODEM_HL78XX_AT_SHELL
+/**
+ * @brief Initialize the AT shell.
+ * @param dev The device structure.
+ * @return 0 on success, negative error code on failure.
+ */
+int hl78xx_at_shell_init(const struct device *dev);
+#endif /* CONFIG_MODEM_HL78XX_AT_SHELL */
+
 #endif /* HL78XX_H */

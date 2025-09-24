@@ -257,8 +257,7 @@ void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *
 		registration_status = atoi(argv[1]);
 	}
 	HL78XX_LOG_DBG("%s: %d", argv[0], registration_status);
-	for(int i = 0; i < argc; i++)
-	{
+	for (int i = 0; i < argc; i++) {
 		HL78XX_LOG_DBG("  argv[%d]: %s", i, argv[i]);
 	}
 	if (registration_status == data->status.registration.network_state_current) {
@@ -1417,24 +1416,24 @@ void hl78xx_enter_state(struct hl78xx_data *data, enum hl78xx_state state)
 
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
-    /** Save the previous state for comparison */
-    enum hl78xx_state prev_state = data->status.state;
+	/** Save the previous state for comparison */
+	enum hl78xx_state prev_state = data->status.state;
 
-    /** Log the incoming event */
-    hl78xx_log_event(evt);
+	/** Log the incoming event */
+	hl78xx_log_event(evt);
 
-    /** Check if the current state is valid and has an event handler */
-    if ((int)prev_state <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF &&
-        hl78xx_state_table[prev_state].on_event) {
-        hl78xx_state_table[prev_state].on_event(data, evt);
-    } else {
-        LOG_ERR("%d %s unknown event", __LINE__, __func__);
-    }
+	/** Check if the current state is valid and has an event handler */
+	if ((int)prev_state <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF &&
+	    hl78xx_state_table[prev_state].on_event) {
+		hl78xx_state_table[prev_state].on_event(data, evt);
+	} else {
+		LOG_ERR("%d %s unknown event", __LINE__, __func__);
+	}
 
-    /** If the state has changed after handling the event, log the transition */
-    if (prev_state != data->status.state) {
-        hl78xx_log_state_changed(prev_state, data->status.state);
-    }
+	/** If the state has changed after handling the event, log the transition */
+	if (prev_state != data->status.state) {
+		hl78xx_log_state_changed(prev_state, data->status.state);
+	}
 }
 
 #ifdef CONFIG_PM_DEVICE
@@ -1610,7 +1609,9 @@ static int hl78xx_init(const struct device *dev)
 	if (ret < 0) {
 		goto error;
 	}
-
+#ifdef CONFIG_MODEM_HL78XX_AT_SHELL
+	hl78xx_at_shell_init(dev);
+#endif /* CONFIG_MODEM_HL78XX_AT_SHELL */
 #ifndef CONFIG_PM_DEVICE
 	hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_RESUME);
 #else
