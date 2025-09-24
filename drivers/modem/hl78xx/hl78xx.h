@@ -47,13 +47,18 @@
 
 #define MDM_KBND_BITMAP_MAX_ARRAY_SIZE 64
 
+#define ADDRESS_FAMILY_NONE_IP    "Non-IP"
 #define ADDRESS_FAMILY_IP         "IP"
 #define ADDRESS_FAMILY_IP4        "IPV4"
 #define ADDRESS_FAMILY_IPV6       "IPV6"
 #define ADDRESS_FAMILY_IPV4V6     "IPV4V6"
 #define MDM_HL78XX_SOCKET_AF_IPV4 0
 #define MDM_HL78XX_SOCKET_AF_IPV6 1
-#if defined(CONFIG_MODEM_HL78XX_ADDRESS_FAMILY_IPV4V6)
+#if defined(CONFIG_MODEM_HL78XX_ADDRESS_FAMILY_NONE)
+#define MODEM_HL78XX_ADDRESS_FAMILY ADDRESS_FAMILY_NONE_IP
+#define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT ""
+#define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT_LEN 0
+#elif defined(CONFIG_MODEM_HL78XX_ADDRESS_FAMILY_IPV4V6)
 #define MODEM_HL78XX_ADDRESS_FAMILY        ADDRESS_FAMILY_IPV4V6
 #define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT "####:####:####:####:####:####:####:####"
 #define MODEM_HL78XX_ADDRESS_FAMILY_FORMAT_LEN                                                     \
@@ -153,6 +158,7 @@ enum hl78xx_event {
 	MODEM_HL78XX_EVENT_BUS_OPENED,
 	MODEM_HL78XX_EVENT_BUS_CLOSED,
 	MODEM_HL78XX_EVENT_SOCKET_READY,
+	MODEM_HL78XX_EVENT_NTN_POSREQ,
 };
 
 enum hl78xx_tcp_notif {
@@ -254,7 +260,10 @@ struct hl78xx_network_operator {
 	char operator[MDM_MODEL_LENGTH];
 	uint8_t format;
 };
-
+struct ntn_rat_state {
+	char pos_mode[8];
+	bool is_dynamic;
+};
 struct modem_status {
 	struct registration_status registration;
 	int16_t rssi;
@@ -268,6 +277,7 @@ struct modem_status {
 	struct hl78xx_phone_functionality_work phone_functionality;
 	struct apn_state apn;
 	struct hl78xx_network_operator network_operator;
+	struct ntn_rat_state ntn_rat;
 };
 
 struct modem_gpio_callbacks {

@@ -219,11 +219,13 @@ static inline void hl78xx_set_errno_from_code(int code)
 static void check_tcp_state_if_needed(struct hl78xx_socket_data *socket_data,
 				      struct modem_socket *sock);
 /* Parser helpers */
-static bool split_ipv4_and_subnet(const char *combined, char *ip_out, size_t ip_out_len,
-				  char *subnet_out, size_t subnet_out_len);
+#if defined(CONFIG_DNS_RESOLVER)
 static bool parse_ip(bool is_ipv4, const char *ip_str, void *out_addr);
 static bool update_dns(struct hl78xx_socket_data *socket_data, bool is_ipv4, const char *dns_str);
 static void set_iface(struct hl78xx_socket_data *socket_data, bool is_ipv4);
+static bool split_ipv4_and_subnet(const char *combined, char *ip_out, size_t ip_out_len,
+				  char *subnet_out, size_t subnet_out_len);
+#endif /* CONFIG_NET_IPV4 || CONFIG_NET_IPV6 */
 static void parser_reset(struct hl78xx_socket_data *socket_data);
 static void found_reset(struct hl78xx_socket_data *socket_data);
 static bool modem_chat_parse_end_del_start(struct hl78xx_socket_data *socket_data,
@@ -613,6 +615,8 @@ void hl78xx_on_cgdcontrdp(struct modem_chat *chat, char **argv, uint16_t argc, v
 	 * Split and parse into the instance IPv4 fields so the interface can be
 	 * configured before the DNS resolver is invoked.
 	 */
+#ifdef CONFIG_DNS_RESOLVER
+
 #ifdef CONFIG_NET_IPV4
 	if (addr_field && strchr(addr_field, '.') && !strchr(addr_field, ':')) {
 		char ip_addr[NET_IPV6_ADDR_LEN] = {0};
@@ -675,9 +679,14 @@ void hl78xx_on_cgdcontrdp(struct modem_chat *chat, char **argv, uint16_t argc, v
 		"<no-v6>"
 #endif
 	);
+#endif /* CONFIG_DNS_RESOLVER */
 }
 /* ===== Network / Parsing Utilities ===================================
  * Helpers that operate on IP address parsing and DNS/address helpers.
+ */
+#if defined(CONFIG_DNS_RESOLVER)
+/* Helper: parse an IP address string into a struct in_addr or in6_addr.
+ * Returns true on success, false on failure.
  */
 static bool parse_ip(bool is_ipv4, const char *ip_str, void *out_addr)
 {
@@ -738,6 +747,14 @@ static bool update_dns(struct hl78xx_socket_data *socket_data, bool is_ipv4, con
 #endif /* CONFIG_NET_IPV6 */
 	return true;
 }
+/* Helper: configure the network interface with the stored IPv4/IPv6
+ * address, subnet and gateway.
+ * If no interface is set, this is a no-op.
+ * If the address is zero/unspecified, this is a no-op.
+ * If the address matches the current iface address, this is a no-op.
+ * Otherwise, the address is applied to the interface and the iface is
+ * brought up.
+ */
 
 static void set_iface(struct hl78xx_socket_data *socket_data, bool is_ipv4)
 {
@@ -786,7 +803,12 @@ static void set_iface(struct hl78xx_socket_data *socket_data, bool is_ipv4)
 	}
 #endif /* CONFIG_NET_IPV6 */
 }
-
+/* Helper: split an IPv4 address + subnet string into separate strings.
+ * The input is expected to be in the form "a.b.c.d.s1.s2.s3.s4" where
+ * a.b.c.d is the IPv4 address and s1.s2.s3.s4 is the subnet mask.
+ * The output buffers must be large enough to hold the resulting strings.
+ * Returns true on success, false on failure.
+ */
 static bool split_ipv4_and_subnet(const char *combined, char *ip_out, size_t ip_out_len,
 				  char *subnet_out, size_t subnet_out_len)
 {
@@ -821,7 +843,7 @@ static bool split_ipv4_and_subnet(const char *combined, char *ip_out, size_t ip_
 	LOG_DBG("Extracted IP: %s, Subnet: %s", ip_out, subnet_out);
 	return true;
 }
-
+#endif /* CONFIG_NET_IPV4 || CONFIG_NET_IPV6 */
 /* ===== Validation ====================================================
  * Small validation helpers used by send/recv paths.
  */
@@ -1177,7 +1199,9 @@ void dns_work_cb(const struct device *dev, bool hard_reset)
 	struct hl78xx_socket_data *socket_data =
 		(struct hl78xx_socket_data *)data->offload_dev->data;
 	struct dns_resolve_context *dnsCtx;
+#if defined(CONFIG_NET_IPV6) || defined(CONFIG_NET_IPV4)
 	struct sockaddr temp_addr;
+#endif
 	bool valid_address = false;
 	bool retry = false;
 	const char *const dns_servers_str[DNS_SERVERS_COUNT] = {
@@ -1248,7 +1272,7 @@ void dns_work_cb(const struct device *dev, bool hard_reset)
 	if (retry) {
 		LOG_WRN("DNS not ready, scheduling a retry");
 	}
-#endif
+#endif /* CONFIG_DNS_RESOLVER */
 }
 
 static int on_cmd_sockread_common(int socket_id, uint16_t socket_data_length, uint16_t len,
@@ -1372,7 +1396,7 @@ static int format_ip_and_setup_tls(struct hl78xx_socket_data *socket_data,
 	}
 	return 0;
 }
-
+#ifdef CONFIG_NET_TCP
 static int send_tcp_or_tls_config(struct modem_socket *sock, uint16_t dst_port, int af, int mode,
 				  struct hl78xx_socket_data *socket_data)
 {
@@ -1397,6 +1421,7 @@ static int send_tcp_or_tls_config(struct modem_socket *sock, uint16_t dst_port, 
 	}
 	return 0;
 }
+#endif /* CONFIG_NET_TCP */
 
 static int send_udp_config(const struct sockaddr *addr, struct hl78xx_socket_data *socket_data,
 			   struct modem_socket *sock)
@@ -1432,8 +1457,7 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 	uint16_t dst_port;
 	char ip_str[NET_IPV6_ADDR_LEN];
 	bool is_udp;
-	int mode;
-	int ret;
+	int ret = 0;
 	/* save destination address */
 	memcpy(&sock->dst, addr, sizeof(*addr));
 	if (extract_ip_family_and_port(addr, &af, &dst_port) < 0) {
@@ -1448,7 +1472,8 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 		LOG_DBG("send_udp_config returned %d", ret);
 		return ret;
 	}
-	mode = (sock->ip_proto == IPPROTO_TLS_1_2) ? 3 : 0;
+#ifdef CONFIG_NET_TCP
+	int mode = (sock->ip_proto == IPPROTO_TLS_1_2) ? 3 : 0;
 	/* only TCP and TLS are supported */
 	if (sock->ip_proto != IPPROTO_TCP && sock->ip_proto != IPPROTO_TLS_1_2) {
 		LOG_ERR("Unsupported protocol: %d", sock->ip_proto);
@@ -1460,6 +1485,7 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr,
 		af, dst_port, mode);
 	ret = send_tcp_or_tls_config(sock, dst_port, af, mode, data);
 	LOG_DBG("send_tcp_or_tls_config returned %d", ret);
+#endif /* CONFIG_NET_TCP */
 	return ret;
 }
 

@@ -23,6 +23,9 @@ int hl78xx_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 int hl78xx_band_cfg(struct hl78xx_data *data, bool *modem_require_restart,
 		    enum hl78xx_cell_rat_mode rat_config_request);
 
+int hl78xx_extra_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
+			 enum hl78xx_cell_rat_mode rat_config_request);
+
 int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size);
 
 /**

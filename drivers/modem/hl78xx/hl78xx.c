@@ -144,6 +144,8 @@ static const char *hl78xx_event_str(enum hl78xx_event event)
 		return "bus closed";
 	case MODEM_HL78XX_EVENT_SOCKET_READY:
 		return "socket ready";
+	case MODEM_HL78XX_EVENT_NTN_POSREQ:
+		return "ntn posreq";
 	default:
 		return "unknown event";
 	}
@@ -255,6 +257,10 @@ void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *
 		registration_status = atoi(argv[1]);
 	}
 	HL78XX_LOG_DBG("%s: %d", argv[0], registration_status);
+	for(int i = 0; i < argc; i++)
+	{
+		HL78XX_LOG_DBG("  argv[%d]: %s", i, argv[i]);
+	}
 	if (registration_status == data->status.registration.network_state_current) {
 		return;
 	}
@@ -472,6 +478,18 @@ void hl78xx_on_kbndcfg(struct modem_chat *chat, char **argv, uint16_t argc, void
 	data->status.kbndcfg[rat_id].bnd_bitmap[kbnd_bitmap_size] = '\0';
 }
 
+void hl78xx_on_kntncfg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+{
+	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
+
+	if (argc < 2) {
+		return;
+	}
+	safe_strncpy((char *)data->status.ntn_rat.pos_mode, argv[1],
+		     sizeof(data->status.ntn_rat.pos_mode));
+	data->status.ntn_rat.is_dynamic = ATOI(argv[2], 0, "is_dynamic");
+}
+
 void hl78xx_on_csq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
 {
 	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
@@ -514,6 +532,16 @@ void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, void *u
 	safe_strncpy((char *)data->status.network_operator.operator, argv[3],
 		     sizeof(data->status.network_operator.operator));
 	data->status.network_operator.format = ATOI(argv[2], 0, "network_operator_format");
+}
+
+void hl78xx_on_kntn_posreq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data)
+{
+	struct hl78xx_data *data = (struct hl78xx_data *)user_data;
+
+	if (argc < 1) {
+		return;
+	}
+	hl78xx_delegate_event(data, MODEM_HL78XX_EVENT_NTN_POSREQ);
 }
 
 /* -------------------------------------------------------------------------
@@ -932,6 +960,10 @@ static int hl78xx_on_rat_cfg_script_state_enter(struct hl78xx_data *data)
 		goto error;
 	}
 
+	ret = hl78xx_extra_rat_cfg(data, &modem_require_restart, rat_config_request);
+	if (ret < 0) {
+		goto error;
+	}
 	if (modem_require_restart) {
 		ret = modem_dynamic_cmd_send(data, NULL, cmd_restart, strlen(cmd_restart),
 					     hl78xx_get_ok_match(), 1, false);
@@ -1041,7 +1073,7 @@ static void hl78xx_enable_gprs_event_handler(struct hl78xx_data *data, enum hl78
 	switch (evt) {
 	case MODEM_HL78XX_EVENT_SCRIPT_SUCCESS:
 	case MODEM_HL78XX_EVENT_SCRIPT_FAILED:
-		hl78xx_start_timer(data, MODEM_HL78XX_PERIODIC_SCRIPT_TIMEOUT);
+		hl78xx_enter_state(data, MODEM_HL78XX_STATE_AWAIT_REGISTERED);
 		break;
 
 	case MODEM_HL78XX_EVENT_TIMEOUT:
@@ -1100,6 +1132,10 @@ static void hl78xx_await_registered_event_handler(struct hl78xx_data *data, enum
 
 	case MODEM_HL78XX_EVENT_SUSPEND:
 		hl78xx_enter_state(data, MODEM_HL78XX_STATE_INIT_POWER_OFF);
+		break;
+
+	case MODEM_HL78XX_EVENT_NTN_POSREQ:
+		hl78xx_run_ntn_pos_script_async(data);
 		break;
 
 	default:
@@ -1381,20 +1417,24 @@ void hl78xx_enter_state(struct hl78xx_data *data, enum hl78xx_state state)
 
 static void hl78xx_event_handler(struct hl78xx_data *data, enum hl78xx_event evt)
 {
-	enum hl78xx_state state;
-	enum hl78xx_state s;
+    /** Save the previous state for comparison */
+    enum hl78xx_state prev_state = data->status.state;
 
-	hl78xx_log_event(evt);
-	s = data->status.state;
-	state = data->status.state;
-	if ((int)s <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF && hl78xx_state_table[s].on_event) {
-		hl78xx_state_table[s].on_event(data, evt);
-	} else {
-		LOG_ERR("%d %s unknown event", __LINE__, __func__);
-	}
-	if (state != s) {
-		hl78xx_log_state_changed(state, s);
-	}
+    /** Log the incoming event */
+    hl78xx_log_event(evt);
+
+    /** Check if the current state is valid and has an event handler */
+    if ((int)prev_state <= MODEM_HL78XX_STATE_AWAIT_POWER_OFF &&
+        hl78xx_state_table[prev_state].on_event) {
+        hl78xx_state_table[prev_state].on_event(data, evt);
+    } else {
+        LOG_ERR("%d %s unknown event", __LINE__, __func__);
+    }
+
+    /** If the state has changed after handling the event, log the transition */
+    if (prev_state != data->status.state) {
+        hl78xx_log_state_changed(prev_state, data->status.state);
+    }
 }
 
 #ifdef CONFIG_PM_DEVICE

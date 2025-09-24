@@ -161,6 +161,42 @@ error:
 	return ret;
 }
 
+int hl78xx_extra_rat_cfg(struct hl78xx_data *data, bool *modem_require_restart,
+			 enum hl78xx_cell_rat_mode rat_config_request)
+{
+	int ret = 0;
+	char cmd_kntncfg[64] = {0};
+	char *pos_provider = NULL;
+	bool is_dynamic = false;
+	if (rat_config_request == HL78XX_RAT_MODE_NONE) {
+		return -EINVAL;
+	}
+
+#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
+#ifdef CONFIG_NTN_POSITION_SOURCE_IGNSS
+	pos_provider = "IGNSS";
+#else
+	pos_provider = "MANUAL";
+#endif
+#ifdef CONFIG_NTN_MOBILITY_TYPE_STATIC
+	is_dynamic = false;
+#else
+	is_dynamic = true;
+#endif
+	/* Enable GNSS based positioning for NB-NTN */
+	snprintf(cmd_kntncfg, sizeof(cmd_kntncfg), "AT+KNTNCFG=\"POS\",\"%s\",%hhu", pos_provider,
+		 is_dynamic);
+
+	ret = modem_dynamic_cmd_send(data, NULL, cmd_kntncfg, strlen(cmd_kntncfg),
+				     hl78xx_get_ok_match(), 1, false);
+	if (ret < 0) {
+		goto error;
+	}
+#endif
+error:
+	return ret;
+}
+
 int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t size)
 {
 	int ret = 0;
@@ -187,6 +223,7 @@ int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t 
 	if (ret < 0) {
 		goto error;
 	}
+#if !defined(CONFIG_MODEM_HL78XX_RAT_NBNTN)
 	snprintk(cmd_string, cmd_max_len,
 		 "AT+KCNXCFG=1,\"GPRS\",\"%s\",,,\"" MODEM_HL78XX_ADDRESS_FAMILY "\"", apn);
 	ret = modem_dynamic_cmd_send(data, NULL, cmd_string, strlen(cmd_string),
@@ -194,6 +231,7 @@ int hl78xx_set_apn_internal(struct hl78xx_data *data, const char *apn, uint16_t 
 	if (ret < 0) {
 		goto error;
 	}
+#endif
 	data->status.apn.state = APN_STATE_CONFIGURED;
 	return 0;
 error:

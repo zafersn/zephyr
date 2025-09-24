@@ -50,10 +50,9 @@ int hl78xx_run_post_restart_script_async(struct hl78xx_data *data);
 /* Async runners for init/periodic scripts */
 int hl78xx_run_init_script_async(struct hl78xx_data *data);
 int hl78xx_run_periodic_script_async(struct hl78xx_data *data);
-
+int hl78xx_run_ntn_pos_script_async(struct hl78xx_data *data);
 /* Getter for ksrat match (moved into chat TU) */
 const struct modem_chat_match *hl78xx_get_ksrat_match(void);
-
 /* Socket-related chat matches used by the sockets TU */
 const struct modem_chat_match *hl78xx_get_sockets_ok_match(void);
 const struct modem_chat_match *hl78xx_get_connect_matches(void);
@@ -65,5 +64,6 @@ const struct modem_chat_match *hl78xx_get_ktcpind_match(void);
 const struct modem_chat_match *hl78xx_get_ktcpcfg_match(void);
 const struct modem_chat_match *hl78xx_get_cgdcontrdp_match(void);
 const struct modem_chat_match *hl78xx_get_ktcp_state_match(void);
+const struct modem_chat_match *hl78xx_get_kntncfg_match(void);
 
 #endif /* ZEPHYR_DRIVERS_MODEM_HL78XX_HL78XX_CHAT_H_ */

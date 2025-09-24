@@ -28,11 +28,8 @@
 LOG_MODULE_DECLARE(hl78xx_dev);
 
 /* Forward declarations of handlers implemented in hl78xx.c (extern linkage) */
+/* unsolicited response handlers */
 void hl78xx_on_cxreg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
-/* +CGCONTRDP handler implemented in hl78xx_sockets.c - declared here so the
- * chat match may reference it. This handler parses PDP context response and
- * updates DNS / interface state for the driver instance.
- */
 void hl78xx_on_cgdcontrdp(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_kstatev(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_socknotifydata(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
@@ -53,6 +50,9 @@ void hl78xx_on_csq(struct modem_chat *chat, char **argv, uint16_t argc, void *us
 void hl78xx_on_cesq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_cfun(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_cops(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
+void hl78xx_on_kntn_posreq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
+
+/* Solicited response handlers */
 void hl78xx_on_ksup(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_imei(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
@@ -63,12 +63,14 @@ void hl78xx_on_iccid(struct modem_chat *chat, char **argv, uint16_t argc, void *
 void hl78xx_on_ksrep(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_ksrat(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 void hl78xx_on_kselacq(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
+void hl78xx_on_kntncfg(struct modem_chat *chat, char **argv, uint16_t argc, void *user_data);
 
 MODEM_CHAT_MATCH_DEFINE(hl78xx_ok_match, "OK", "", NULL);
 MODEM_CHAT_MATCHES_DEFINE(hl78xx_allow_match, MODEM_CHAT_MATCH("OK", "", NULL),
 			  MODEM_CHAT_MATCH(CME_ERROR_STRING, "", NULL));
-
-MODEM_CHAT_MATCHES_DEFINE(hl78xx_unsol_matches, MODEM_CHAT_MATCH("+CREG: ", ",", hl78xx_on_cxreg),
+/* clang-format off */
+MODEM_CHAT_MATCHES_DEFINE(hl78xx_unsol_matches, 
+			  MODEM_CHAT_MATCH("+CREG: ", ",", hl78xx_on_cxreg),
 			  MODEM_CHAT_MATCH("+CEREG: ", ",", hl78xx_on_cxreg),
 			  MODEM_CHAT_MATCH("+CGREG: ", ",", hl78xx_on_cxreg),
 			  MODEM_CHAT_MATCH("+KSTATEV: ", ",", hl78xx_on_kstatev),
@@ -82,8 +84,10 @@ MODEM_CHAT_MATCHES_DEFINE(hl78xx_unsol_matches, MODEM_CHAT_MATCH("+CREG: ", ",",
 			  MODEM_CHAT_MATCH("+CSQ: ", ",", hl78xx_on_csq),
 			  MODEM_CHAT_MATCH("+CESQ: ", ",", hl78xx_on_cesq),
 			  MODEM_CHAT_MATCH("+CFUN: ", "", hl78xx_on_cfun),
-			  MODEM_CHAT_MATCH("+COPS: ", ",", hl78xx_on_cops));
-
+			  MODEM_CHAT_MATCH("+COPS: ", ",", hl78xx_on_cops),
+			  MODEM_CHAT_MATCH("+KNTNEV: \"POSREQ\"", "", hl78xx_on_kntn_posreq),
+			);
+/* clang-format on */
 MODEM_CHAT_MATCHES_DEFINE(hl78xx_abort_matches, MODEM_CHAT_MATCH("+CME ERROR: ", "", NULL));
 MODEM_CHAT_MATCH_DEFINE(hl78xx_at_ready_match, "+KSUP: ", "", hl78xx_on_ksup);
 MODEM_CHAT_MATCH_DEFINE(hl78xx_imei_match, "", "", hl78xx_on_imei);
@@ -95,6 +99,7 @@ MODEM_CHAT_MATCH_DEFINE(hl78xx_iccid_match, "+CCID: ", "", hl78xx_on_iccid);
 MODEM_CHAT_MATCH_DEFINE(hl78xx_ksrep_match, "+KSREP: ", ",", hl78xx_on_ksrep);
 MODEM_CHAT_MATCH_DEFINE(hl78xx_ksrat_match, "+KSRAT: ", "", hl78xx_on_ksrat);
 MODEM_CHAT_MATCH_DEFINE(hl78xx_kselacq_match, "+KSELACQ: ", ",", hl78xx_on_kselacq);
+MODEM_CHAT_MATCH_DEFINE(hl78xx_kntncfg_match, "+KNTNCFG: ", ",", hl78xx_on_kntncfg);
 
 /* Chat script matches / definitions */
 MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_periodic_chat_script_cmds,
@@ -103,37 +108,39 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_periodic_chat_script_cmds,
 MODEM_CHAT_SCRIPT_DEFINE(hl78xx_periodic_chat_script, hl78xx_periodic_chat_script_cmds,
 			 hl78xx_abort_matches, hl78xx_chat_callback_handler, 4);
 
-MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_init_chat_script_cmds,
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_at_ready_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KHWIOCFG=3,1,6", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("ATE0", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP_MULT("AT+CGACT=0", hl78xx_allow_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CFUN=4,0", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSLEEP=2", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CPSMS=0", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEDRXS=0", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KPATTERN=\"--EOF--Pattern--\"",
-							 hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CCID", hl78xx_iccid_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CMEE=1", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", hl78xx_imei_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", hl78xx_cgmm_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMI", hl78xx_cgmi_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMR", hl78xx_cgmr_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CIMI", hl78xx_cimi_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGEREP=2", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSELACQ?", hl78xx_kselacq_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSRAT?", hl78xx_ksrat_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+KBNDCFG?", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGACT?", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CREG=0", hl78xx_ok_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEREG=5", hl78xx_ok_match));
+MODEM_CHAT_SCRIPT_CMDS_DEFINE(
+	hl78xx_init_chat_script_cmds, MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_at_ready_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KHWIOCFG=3,1,6", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("ATE0", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP_MULT("AT+CGACT=0", hl78xx_allow_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CFUN=4,0", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSLEEP=2", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CPSMS=0", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEDRXS=0", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KPATTERN=\"--EOF--Pattern--\"", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CCID", hl78xx_iccid_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CMEE=1", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", hl78xx_imei_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", hl78xx_cgmm_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMI", hl78xx_cgmi_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMR", hl78xx_cgmr_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CIMI", hl78xx_cimi_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSTATEV=1", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGEREP=2", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSELACQ?", hl78xx_kselacq_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KSRAT?", hl78xx_ksrat_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KBNDCFG?", hl78xx_ok_match),
+#ifdef CONFIG_MODEM_HL78XX_RAT_NBNTN
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KNTNCFG=\"POS\"", hl78xx_kntncfg_match),
+#endif
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGACT?", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CREG=0", hl78xx_ok_match),
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+CEREG=5", hl78xx_ok_match));
 
 MODEM_CHAT_SCRIPT_DEFINE(hl78xx_init_chat_script, hl78xx_init_chat_script_cmds,
 			 hl78xx_abort_matches, hl78xx_chat_callback_handler, 10);
@@ -169,6 +176,14 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(hl78xx_pwroff_cmds,
 MODEM_CHAT_SCRIPT_DEFINE(hl78xx_pwroff_script, hl78xx_pwroff_cmds, hl78xx_abort_matches,
 			 hl78xx_chat_callback_handler, 4);
 
+MODEM_CHAT_SCRIPT_CMDS_DEFINE(
+	hl78xx_ntn_pos_cmds,
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT+KNTNCMD=\"POS\",\"" CONFIG_NTN_MANUAL_LATITUDE
+				   "\",\"" CONFIG_NTN_MANUAL_LONGITUDE
+				   "\",\"" CONFIG_NTN_MANUAL_ALTITUDE "\"",
+				   hl78xx_ok_match));
+MODEM_CHAT_SCRIPT_DEFINE(hl78xx_ntn_pos_script, hl78xx_ntn_pos_cmds, hl78xx_abort_matches,
+			 hl78xx_chat_callback_handler, 10);
 /* Socket-specific matches and wrappers exposed for the sockets translation
  * unit. These were extracted from hl78xx_sockets.c to centralize chat
  * definitions.
@@ -327,6 +342,11 @@ const struct modem_chat_match *hl78xx_get_ksrat_match(void)
 	return &hl78xx_ksrat_match;
 }
 
+const struct modem_chat_match *hl78xx_get_kntncfg_match(void)
+{
+	return &hl78xx_kntncfg_match;
+}
+
 int hl78xx_run_post_restart_script(struct hl78xx_data *data)
 {
 	if (!data) {
@@ -365,4 +385,12 @@ int hl78xx_run_pwroff_script_async(struct hl78xx_data *data)
 		return -EINVAL;
 	}
 	return modem_chat_run_script_async(&data->chat, &hl78xx_pwroff_script);
+}
+
+int hl78xx_run_ntn_pos_script_async(struct hl78xx_data *data)
+{
+	if (!data) {
+		return -EINVAL;
+	}
+	return modem_chat_run_script_async(&data->chat, &hl78xx_ntn_pos_script);
 }
