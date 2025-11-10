@@ -95,7 +95,6 @@ enum hl78xx_module_status {
 	/** Inactive SIM. */
 	HL78XX_MODULE_INACTIVE_SIM
 };
-
 /** Cellular modem info type */
 enum hl78xx_modem_info_type {
 	/* <APN> Access Point Name */
@@ -109,7 +108,6 @@ enum hl78xx_modem_info_type {
 	/* Current Baud Rate */
 	HL78XX_MODEM_INFO_CURRENT_BAUD_RATE,
 };
-
 /** Cellular network structure */
 struct hl78xx_network {
 	/** Cellular access technology */
