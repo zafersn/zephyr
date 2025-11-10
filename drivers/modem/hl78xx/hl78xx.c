@@ -1109,6 +1109,15 @@ static void hl78xx_set_baudrate_event_handler(struct hl78xx_data *data, enum hl7
 		hl78xx_enter_state(data, MODEM_HL78XX_STATE_IDLE);
 		break;
 
+	case MODEM_HL78XX_EVENT_BUS_OPENED:
+		modem_chat_attach(&data->chat, data->uart_pipe);
+		hl78xx_run_post_restart_script_async(data);
+		break;
+
+	case MODEM_HL78XX_EVENT_SCRIPT_SUCCESS:
+		hl78xx_enter_state(data, MODEM_HL78XX_STATE_RUN_INIT_SCRIPT);
+		break;
+
 	default:
 		break;
 	}

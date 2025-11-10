@@ -18,15 +18,15 @@ extern "C" {
 #endif
 
 /* Magic constants */
-#define CSQ_RSSI_UNKNOWN        (99)
-#define CESQ_RSRP_UNKNOWN       (255)
-#define CESQ_RSRQ_UNKNOWN       (255)
+#define CSQ_RSSI_UNKNOWN         (99)
+#define CESQ_RSRP_UNKNOWN        (255)
+#define CESQ_RSRQ_UNKNOWN        (255)
 /* Magic numbers to units conversions */
-#define CSQ_RSSI_TO_DB(v)       (-113 + (2 * (v)))
-#define CESQ_RSRP_TO_DB(v)      (-140 + (v))
-#define CESQ_RSRQ_TO_DB(v)      (-20 + ((v) / 2))
+#define CSQ_RSSI_TO_DB(v)        (-113 + (2 * (v)))
+#define CESQ_RSRP_TO_DB(v)       (-140 + (v))
+#define CESQ_RSRQ_TO_DB(v)       (-20 + ((v) / 2))
 /** Monitor is paused. */
-#define PAUSED                  1
+#define PAUSED                   1
 /** Monitor is active, default */
 #define ACTIVE                  0
 #define MDM_MANUFACTURER_LENGTH 20
