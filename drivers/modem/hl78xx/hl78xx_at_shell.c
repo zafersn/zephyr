@@ -64,7 +64,7 @@ static void at_shell_script_callback(struct modem_chat *chat, enum modem_chat_sc
 }
 
 MODEM_CHAT_SCRIPT_DEFINE(at_shell_script, at_shell_script_chat, at_shell_abort_matches,
-			 at_shell_script_callback, CONFIG_MODEM_AT_SHELL_RESPONSE_TIMEOUT_MS);
+			 at_shell_script_callback, 5);
 
 static void at_shell_init_script_chat(void)
 {
