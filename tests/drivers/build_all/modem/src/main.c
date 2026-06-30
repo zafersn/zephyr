@@ -19,6 +19,9 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(board_init_script_cmds,
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT", board_init_ok_match));
 MODEM_CHAT_SCRIPT_NO_ABORT_DEFINE(board_init_script, board_init_script_cmds, NULL, 4);
 MODEM_CELLULAR_BOARD_INIT_DEFINE(DT_NODELABEL(test_quectel_eg25_g), &board_init_script);
+#elif CONFIG_MODEM_HL78XX
+#include <zephyr/modem/chat.h>
+
 #endif /* CONFIG_MODEM_CELLULAR */
 
 int main(void)
@@ -36,6 +39,9 @@ int main(void)
 	__maybe_unused const struct device *sqn_gm02s = DEVICE_DT_GET_ONE(sqn_gm02s);
 	__maybe_unused const struct device *st_st87mxx = DEVICE_DT_GET_ONE(st_st87mxx);
 	__maybe_unused const struct device *trasna_lexi_r10 = DEVICE_DT_GET_ONE(trasna_lexi_r10);
+#elif CONFIG_MODEM_HL78XX
+	/* Validate drivers compiled in */
+	__maybe_unused const struct device *hl78xx = DEVICE_DT_GET_ONE(swir_hl78xx);
 #endif /* CONFIG_MODEM_CELLULAR */
 	return 0;
 }
