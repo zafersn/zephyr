@@ -65,3 +65,7 @@ tests:
     extra_args: EXTRA_CONF_FILE=modem_st87mxx.conf
     extra_configs:
       - CONFIG_UART_ASYNC_API=y
+  drivers.modem.modem_standalone_hl78xx.interrupt_driven.build:
+    extra_args: EXTRA_CONF_FILE=modem_standalone_hl78xx.conf
+    extra_configs:
+      - CONFIG_UART_ASYNC_API=y
